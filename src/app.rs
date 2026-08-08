@@ -1027,10 +1027,8 @@ impl SimpleComponent for App {
                         fn walk(w: &gtk::Widget, depth: usize, threshold: i32) {
                             let (m, n, _, _) = w.measure(gtk::Orientation::Horizontal, -1);
                             if m >= threshold {
-                                let label = w
-                                    .buildable_id()
-                                    .map(|s| s.to_string())
-                                    .unwrap_or_default();
+                                let label =
+                                    w.buildable_id().map(|s| s.to_string()).unwrap_or_default();
                                 println!(
                                     "MEASURE {:indent$}{} min={m} nat={n} {label}",
                                     "",

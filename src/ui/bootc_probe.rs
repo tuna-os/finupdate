@@ -247,7 +247,10 @@ pub(super) fn parse_booted_tag_suffix(json: &Value) -> Option<String> {
 ///    is `20260530` and the registry side is `latest.20260530`.
 /// 3. `v.date == parsed_date(anchor)` — last resort when the version string
 ///    diverges entirely (Dakota's commit-sha tags annotate as `latest`).
-pub(super) fn find_booted_match<'a>(versions: &'a [ImageVersion], anchor: &str) -> Option<&'a ImageVersion> {
+pub(super) fn find_booted_match<'a>(
+    versions: &'a [ImageVersion],
+    anchor: &str,
+) -> Option<&'a ImageVersion> {
     if let Some(v) = versions.iter().find(|v| v.version == anchor) {
         return Some(v);
     }
@@ -693,7 +696,6 @@ pub(super) fn read_bootc_image_info_config() -> Option<BootcImageInfoConfig> {
     serde_json::from_str(&content).ok()
 }
 
-
 pub(super) fn strip_date_suffix(tag: &str) -> Option<String> {
     for sep in ['.', '-'] {
         if let Some(pos) = tag.rfind(sep) {
@@ -967,7 +969,6 @@ pub(super) fn get_real_deployments() -> Option<Vec<MockDeployment>> {
     get_cached_bootc_status().and_then(|json| get_real_deployments_from_json(&json))
 }
 
-
 pub(super) fn get_host_kernel() -> String {
     let output = if crate::update_worker::is_flatpak() {
         Command::new("flatpak-spawn")
@@ -984,7 +985,6 @@ pub(super) fn get_host_kernel() -> String {
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "—".to_string())
 }
-
 
 #[cfg(test)]
 mod tests {

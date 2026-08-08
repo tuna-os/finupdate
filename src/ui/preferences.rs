@@ -152,7 +152,7 @@ fn build_updates_group(
     // Only shown when uupd is installed (the config file only matters then).
     let configure_row = adw::ActionRow::builder()
         .title("_Configure Automatic Updates")
-            .use_underline(true)
+        .use_underline(true)
         .subtitle("Hardware checks and per-module toggles in /etc/uupd/config.json")
         .activatable(true)
         .visible(uupd_compat::is_uupd_installed())
@@ -192,7 +192,7 @@ fn build_updates_group(
 
     let custom_action_row = adw::ActionRow::builder()
         .title("Custom Inter_val")
-            .use_underline(true)
+        .use_underline(true)
         .subtitle("Number of hours between update checks")
         .build();
 
@@ -486,7 +486,7 @@ fn build_uupd_config_subpage() -> adw::NavigationPage {
 
     let enable_hw_row = adw::SwitchRow::builder()
         .title("_Enable Hardware Checks")
-            .use_underline(true)
+        .use_underline(true)
         .subtitle("Honor the thresholds below before running automatic updates")
         .active(config.borrow().checks.hardware.enable)
         .build();
@@ -633,7 +633,7 @@ fn build_uupd_config_subpage() -> adw::NavigationPage {
         .build();
     let save_row = adw::ActionRow::builder()
         .title("_Save to /etc/uupd/config.json")
-            .use_underline(true)
+        .use_underline(true)
         .subtitle("Requires administrator authentication")
         .build();
     save_row.add_suffix(&save_button);

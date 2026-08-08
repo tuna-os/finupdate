@@ -616,12 +616,20 @@ impl StatusView {
         }
 
         let mut upgrades_list: Vec<(String, String, String)> = Vec::new();
+        let mut downgrades_list: Vec<(String, String, String)> = Vec::new();
         let mut added_list: Vec<(String, String)> = Vec::new();
         let mut removals_list: Vec<String> = Vec::new();
 
         if let Some(ref diff) = self.sbom_diff {
             for pkg in &diff.upgraded {
                 upgrades_list.push((
+                    pkg.name.clone(),
+                    pkg.old_version.clone(),
+                    pkg.new_version.clone(),
+                ));
+            }
+            for pkg in &diff.downgraded {
+                downgrades_list.push((
                     pkg.name.clone(),
                     pkg.old_version.clone(),
                     pkg.new_version.clone(),
@@ -716,13 +724,40 @@ impl StatusView {
 
             for (pkg, from, to) in upgrades_list {
                 let row = adw::ActionRow::builder().title(&pkg).build();
-                // Always `bumped` — every row in this list is an upgrade, so
-                // the target renders success-green, mirroring the
-                // bluefin-changelog TUI's `changed` styling.
+                // version_diff_box re-derives the direction, so a package that
+                // landed here with unorderable versions still renders neutral
+                // rather than claiming an upgrade.
                 row.add_suffix(&version_diff_box(&from, &to, true));
                 list_upgrades.append(&row);
             }
             self.changelog_box.append(&list_upgrades);
+        }
+
+        // Downgrades get their own section rather than being folded into
+        // "Updated". Rolling back, or moving to an older stream, is a normal
+        // thing to do — but it needs saying out loud, not burying in a list
+        // whose heading claims everything moved forward.
+        if !downgrades_list.is_empty() {
+            let downgrades_title = gtk::Label::builder()
+                .label(&format!("Downgraded  ·  {}", downgrades_list.len()))
+                .halign(gtk::Align::Start)
+                .margin_top(12)
+                .build();
+            downgrades_title.add_css_class("caption");
+            downgrades_title.add_css_class("dim-label");
+            self.changelog_box.append(&downgrades_title);
+
+            let list_downgrades = gtk::ListBox::builder()
+                .selection_mode(gtk::SelectionMode::None)
+                .build();
+            list_downgrades.add_css_class("card");
+
+            for (pkg, from, to) in downgrades_list {
+                let row = adw::ActionRow::builder().title(&pkg).build();
+                row.add_suffix(&version_diff_box(&from, &to, true));
+                list_downgrades.append(&row);
+            }
+            self.changelog_box.append(&list_downgrades);
         }
 
         if !added_list.is_empty() {
@@ -2154,7 +2189,10 @@ impl SimpleComponent for StatusView {
                                 );
                                 toast_overlay.add_toast(toast);
                             } else {
-                                super::host_actions::run_bootc_install_reset(&toast_overlay, "Factory reset");
+                                super::host_actions::run_bootc_install_reset(
+                                    &toast_overlay,
+                                    "Factory reset",
+                                );
                             }
                         }
                         dlg.close();
@@ -2692,7 +2730,11 @@ fn rebuild_history_list(
             .icon_name(chevron_icon)
             // Icon-only, so it needs both a tooltip and an accessible name —
             // otherwise a screen reader announces an unlabelled button.
-            .tooltip_text(if is_expanded { "Hide details" } else { "Show details" })
+            .tooltip_text(if is_expanded {
+                "Hide details"
+            } else {
+                "Show details"
+            })
             .build();
         chev_btn.update_property(&[gtk::accessible::Property::Label(if is_expanded {
             "Hide details"
@@ -2926,7 +2968,9 @@ fn spawn_changelog_fetch(
                             t.elapsed().as_millis(),
                             available.len()
                         );
-                        let _ = sender.input_sender().send(StatusViewInput::AvailableTagsLoaded(available));
+                        let _ = sender
+                            .input_sender()
+                            .send(StatusViewInput::AvailableTagsLoaded(available));
                     }
                     Ok(_) => println!(
                         "[debug] changelog: phase=list_available_tags ms={} count=0",
@@ -2996,11 +3040,14 @@ fn spawn_changelog_fetch(
                 println!("[debug] changelog: phase=github_commits url={}", url);
                 if let Ok(resp) = client.get(&url).send().await {
                     if let Ok(commits_json) = resp.json::<Vec<GithubCommit>>().await {
-                        all_commits.extend(
-                            commits_json
-                                .into_iter()
-                                .map(|c| (c.sha, c.commit.message, c.commit.author.name, c.commit.author.date)),
-                        );
+                        all_commits.extend(commits_json.into_iter().map(|c| {
+                            (
+                                c.sha,
+                                c.commit.message,
+                                c.commit.author.name,
+                                c.commit.author.date,
+                            )
+                        }));
                     }
                 }
 
@@ -3017,7 +3064,14 @@ fn spawn_changelog_fetch(
                             commits_json
                                 .into_iter()
                                 .filter(|c| c.commit.message.starts_with("feat:"))
-                                .map(|c| (c.sha, c.commit.message, c.commit.author.name, c.commit.author.date)),
+                                .map(|c| {
+                                    (
+                                        c.sha,
+                                        c.commit.message,
+                                        c.commit.author.name,
+                                        c.commit.author.date,
+                                    )
+                                }),
                         );
                     }
                 }
@@ -3038,7 +3092,9 @@ fn spawn_changelog_fetch(
                     t_github.elapsed().as_millis(),
                     all_commits.len()
                 );
-                let _ = sender.input_sender().send(StatusViewInput::GithubCommitsLoaded(all_commits));
+                let _ = sender
+                    .input_sender()
+                    .send(StatusViewInput::GithubCommitsLoaded(all_commits));
             }
             println!(
                 "[debug] changelog: phase=total ms={}",
@@ -3061,8 +3117,8 @@ fn spawn_changelog_fetch(
             let settings = Settings::load();
             // Prefer the actual date-stamped full_ref of the newest build;
             // fall back to the stream tag only if we got no versions.
-            let target_ref = newest_full_ref
-                .unwrap_or_else(|| format!("{}:{}", registry_uri, selected_tag));
+            let target_ref =
+                newest_full_ref.unwrap_or_else(|| format!("{}:{}", registry_uri, selected_tag));
 
             // Get the booted image's actual digest-pinned ref from bootc
             // status or mock_identity so we compare two distinct manifests.
@@ -3085,9 +3141,7 @@ fn spawn_changelog_fetch(
                             .and_then(|v| v.as_str())?;
                         Some(format!("{}@{}", img, digest))
                     })
-                    .unwrap_or_else(|| {
-                        format!("{}:{}", registry_uri, read_selected_tag())
-                    })
+                    .unwrap_or_else(|| format!("{}:{}", registry_uri, read_selected_tag()))
             };
 
             if booted_ref != target_ref {
@@ -3103,16 +3157,19 @@ fn spawn_changelog_fetch(
                         booted_ref,
                         target_ref
                     );
-                    match crate::sbom_diff::fetch_and_diff_sboms(booted_ref, target_ref).await
-                    {
+                    match crate::sbom_diff::fetch_and_diff_sboms(booted_ref, target_ref).await {
                         Some(diff) => {
-                            let _ = sbom_sender.input_sender().send(StatusViewInput::SbomDiffLoaded(diff));
+                            let _ = sbom_sender
+                                .input_sender()
+                                .send(StatusViewInput::SbomDiffLoaded(diff));
                         }
                         None => {
                             tracing::info!(
                                 "sbom_diff: no diff available (registry didn't return SPDX referrers)"
                             );
-                            let _ = sbom_sender.input_sender().send(StatusViewInput::SbomDiffUnavailable);
+                            let _ = sbom_sender
+                                .input_sender()
+                                .send(StatusViewInput::SbomDiffUnavailable);
                         }
                     }
                 });

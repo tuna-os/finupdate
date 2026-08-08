@@ -15,7 +15,6 @@
 
 use std::cmp::Ordering;
 
-
 /// Anything that isn't alphanumeric or `~`/`^` is a separator in RPM's
 /// grammar, so `1.2.3` and `1_2_3` compare equal.
 fn skip_separators(s: &[u8]) -> &[u8] {
@@ -224,7 +223,10 @@ mod tests {
     #[test]
     fn epoch_dominates_version() {
         // Without epoch handling this reads as a downgrade.
-        assert_eq!(compare_evr("5:1.0-1.fc44", "4:9.9-1.fc44"), Ordering::Greater);
+        assert_eq!(
+            compare_evr("5:1.0-1.fc44", "4:9.9-1.fc44"),
+            Ordering::Greater
+        );
         assert_eq!(compare_evr("1.0-1.fc44", "0:1.0-1.fc44"), Ordering::Equal);
     }
 
@@ -249,7 +251,10 @@ mod tests {
 
     #[test]
     fn classifies_upgrades_and_equals() {
-        assert_eq!(classify("49.7-1.fc43", "50.3-1.fc44"), VersionChange::Upgrade);
+        assert_eq!(
+            classify("49.7-1.fc43", "50.3-1.fc44"),
+            VersionChange::Upgrade
+        );
         assert_eq!(classify("1.0-1", "1.0-1"), VersionChange::Same);
     }
 

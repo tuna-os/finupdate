@@ -36,10 +36,7 @@ use crate::update_worker::is_flatpak;
 pub type OnShowChangelog = Rc<dyn Fn(String)>;
 
 /// Open the rebase history dialog as a child of `parent`.
-pub fn show_rebase_dialog(
-    parent: &gtk::Widget,
-    on_show_changelog: OnShowChangelog,
-) {
+pub fn show_rebase_dialog(parent: &gtk::Widget, on_show_changelog: OnShowChangelog) {
     let dialog = adw::Dialog::builder()
         .title("Pin to a Previous Build")
         .content_width(520)
@@ -1580,10 +1577,8 @@ async fn run_bootc_switch(
     // makes "clicking Switch would run `bootc switch <the right ref>`"
     // assertable in the GUI suite.
     let settings = crate::settings::Settings::load();
-    let suppressed = crate::action_journal::Suppressed::from_flags(
-        settings.dev_mode,
-        settings.dry_run,
-    );
+    let suppressed =
+        crate::action_journal::Suppressed::from_flags(settings.dev_mode, settings.dry_run);
 
     let mut cmd = match crate::privileged::privileged_async(
         "switch_image",

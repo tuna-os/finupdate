@@ -43,7 +43,15 @@ pub struct PackageDiff {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct SbomDiffResult {
+    /// Packages whose version moved *forward*. Named `upgraded` and treated
+    /// as such by the UI, so it must not also carry downgrades — it did until
+    /// the split below, because the test was `booted != target`.
     pub upgraded: Vec<PackageDiff>,
+    /// Packages whose version moved backward — switching to an older stream,
+    /// or rolling back. `serde(default)` so a cached diff written before this
+    /// field existed still deserialises.
+    #[serde(default)]
+    pub downgraded: Vec<PackageDiff>,
     pub removed: Vec<String>,
     pub added: Vec<PackageDiff>,
     #[serde(default)]
@@ -534,18 +542,30 @@ pub fn diff_packages(
     booted_map: &HashMap<String, String>,
     target_map: &HashMap<String, String>,
 ) -> SbomDiffResult {
+    use crate::version_compare::{VersionChange, classify};
+
     let mut upgraded = Vec::new();
+    let mut downgraded = Vec::new();
     let mut removed = Vec::new();
     let mut added = Vec::new();
 
     for (name, booted_ver) in booted_map {
         match target_map.get(name) {
             Some(target_ver) if booted_ver != target_ver => {
-                upgraded.push(PackageDiff {
+                let entry = PackageDiff {
                     name: name.clone(),
                     old_version: booted_ver.clone(),
                     new_version: target_ver.clone(),
-                });
+                };
+                // Direction, not mere difference. Everything landed in
+                // `upgraded` before, so a rollback reported dozens of
+                // "upgrades" that were all going backwards. Versions we
+                // cannot order (Unknown) stay in `upgraded` — it is the
+                // general "changed" bucket and the UI renders those neutrally.
+                match classify(booted_ver, target_ver) {
+                    VersionChange::Downgrade => downgraded.push(entry),
+                    _ => upgraded.push(entry),
+                }
             }
             Some(_) => {}
             None => removed.push(name.clone()),
@@ -563,6 +583,7 @@ pub fn diff_packages(
     }
 
     upgraded.sort_by(|a, b| a.name.cmp(&b.name));
+    downgraded.sort_by(|a, b| a.name.cmp(&b.name));
     removed.sort();
     added.sort_by(|a, b| a.name.cmp(&b.name));
 
@@ -570,6 +591,7 @@ pub fn diff_packages(
 
     SbomDiffResult {
         upgraded,
+        downgraded,
         removed,
         added,
         stack_info,
@@ -752,6 +774,66 @@ mod tests {
 }
 
 #[cfg(test)]
+mod direction_tests {
+    use super::*;
+
+    fn map(entries: &[(&str, &str)]) -> HashMap<String, String> {
+        entries
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    /// A rollback must not be reported as a list of upgrades.
+    ///
+    /// Every changed package used to land in `upgraded`, so switching from
+    /// Dakota's F44 to Bluefin's F43 produced a "Updated · 65" heading over
+    /// sixty-five packages that were all moving backwards.
+    #[test]
+    fn splits_downgrades_out_of_upgrades() {
+        let booted = map(&[
+            ("gnome-shell", "50.3-1.fc44"),
+            ("bootc", "1.15.1-1.fc43"),
+            ("mesa", "26.1.4-4.fc44"),
+        ]);
+        let target = map(&[
+            ("gnome-shell", "49.7-1.fc43"), // back
+            ("bootc", "1.16.3-1.fc44"),     // forward
+            ("mesa", "26.1.4-4.fc44"),      // unchanged
+        ]);
+
+        let d = diff_packages(&booted, &target);
+
+        assert_eq!(
+            d.upgraded
+                .iter()
+                .map(|p| p.name.as_str())
+                .collect::<Vec<_>>(),
+            ["bootc"]
+        );
+        assert_eq!(
+            d.downgraded
+                .iter()
+                .map(|p| p.name.as_str())
+                .collect::<Vec<_>>(),
+            ["gnome-shell"]
+        );
+        assert!(d.removed.is_empty() && d.added.is_empty());
+    }
+
+    /// Versions we cannot order stay in `upgraded`, the general "changed"
+    /// bucket, rather than being asserted as a downgrade on a guess.
+    #[test]
+    fn unorderable_versions_are_not_called_downgrades() {
+        let booted = map(&[("weird", "")]);
+        let target = map(&[("weird", "deadbeef")]);
+        let d = diff_packages(&booted, &target);
+        assert!(d.downgraded.is_empty());
+        assert_eq!(d.upgraded.len(), 1);
+    }
+}
+
+#[cfg(test)]
 mod parse_tests {
     use super::*;
 
@@ -841,14 +923,23 @@ mod network_tests {
             .await
             .unwrap();
         println!("blob bytes: {}", blob.len());
-        println!("first 300: {}", String::from_utf8_lossy(&blob[..blob.len().min(300)]));
+        println!(
+            "first 300: {}",
+            String::from_utf8_lossy(&blob[..blob.len().min(300)])
+        );
         let parsed: Result<serde_json::Value, _> = serde_json::from_slice(&blob);
         match parsed {
             Ok(v) => {
-                println!("top-level keys: {:?}",
-                    v.as_object().map(|o| o.keys().cloned().collect::<Vec<_>>()));
-                println!("packages len: {:?}",
-                    v.get("packages").and_then(|p| p.as_array()).map(|a| a.len()));
+                println!(
+                    "top-level keys: {:?}",
+                    v.as_object().map(|o| o.keys().cloned().collect::<Vec<_>>())
+                );
+                println!(
+                    "packages len: {:?}",
+                    v.get("packages")
+                        .and_then(|p| p.as_array())
+                        .map(|a| a.len())
+                );
             }
             Err(e) => println!("not JSON: {e}"),
         }
