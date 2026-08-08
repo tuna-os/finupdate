@@ -329,7 +329,14 @@ fn build_system_group(
             .subtitle(subtitle)
             .activatable(true)
             .build();
-        row.set_accessible_role(gtk::AccessibleRole::Button);
+        // Upcast to gtk::Widget before setting the role: libadwaita 0.9.2
+        // dropped gtk::Accessible from AdwActionRow's implemented-interfaces
+        // list, so AccessibleExt is no longer callable on the row directly.
+        // gtk::Widget still implements Accessible, and the role is a Widget
+        // property, so this sets exactly the same thing on both 0.9.1 and
+        // 0.9.2 — the screen-reader role is preserved, not dropped.
+        row.upcast_ref::<gtk::Widget>()
+            .set_accessible_role(gtk::AccessibleRole::Button);
         let chev = gtk::Image::from_icon_name("go-next-symbolic");
         chev.add_css_class("dim-label");
         row.add_suffix(&chev);
