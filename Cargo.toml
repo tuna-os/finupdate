@@ -40,7 +40,7 @@ pangocairo = "0.22"
 
 # HTTP client for GHCR registry queries (rebase calendar).
 # rustls-tls: pure-Rust TLS — no system OpenSSL needed inside the Flatpak sandbox.
-reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 
 # Date/time utilities — used to parse YYYYMMDD image tags and display build dates.
 chrono = { version = "0.4", features = ["serde"] }
