@@ -1358,7 +1358,13 @@ impl SimpleComponent for StatusView {
             .activatable(true)
             .use_underline(true)
             .build();
-        advanced_row.set_accessible_role(gtk::AccessibleRole::Button);
+        // Upcast to gtk::Widget before setting the role — see the identical
+        // note in `ui::preferences`: libadwaita 0.9.2 no longer lists
+        // gtk::Accessible among AdwActionRow's interfaces, but gtk::Widget
+        // implements it, so the role is preserved rather than dropped.
+        advanced_row
+            .upcast_ref::<gtk::Widget>()
+            .set_accessible_role(gtk::AccessibleRole::Button);
         allow_narrow(&advanced_row);
         let adv_chev = gtk::Image::from_icon_name("go-next-symbolic");
         adv_chev.add_css_class("dim-label");
