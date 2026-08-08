@@ -66,7 +66,7 @@ finupdate-core = { path = "finupdate-core" }
 
 # OCI registry client — pure-Rust, used for SBOM referrer discovery and pull.
 # rustls-tls: no system OpenSSL needed inside the Flatpak sandbox.
-oci-client = { version = "0.15", default-features = false, features = ["rustls-tls"] }
+oci-client = { version = "0.17", default-features = false, features = ["rustls-tls"] }
 
 [lib]
 # `cdylib` produces `libfinupdate.so` for the C-side gnome-control-center
