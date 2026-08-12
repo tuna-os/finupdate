@@ -5,6 +5,7 @@
 
 pub mod bootc_probe;
 pub(crate) mod bootc_progress; // helper: bootc switch progress parse + subprocess runner
+pub mod history_list;
 pub mod host_actions;
 pub mod log_view;
 pub mod preferences;
