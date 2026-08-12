@@ -10,6 +10,7 @@ pub mod host_actions;
 pub mod log_view;
 pub mod preferences;
 pub mod rebase_dialog;
+pub(crate) mod rebase_target; // helper: pure rebase target resolution
 pub mod segmented_progress;
 pub(crate) mod settings_io; // helper: auto-update settings read/write + timer toggle
 pub mod status_view;
