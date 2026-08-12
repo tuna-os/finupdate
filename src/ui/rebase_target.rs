@@ -7,7 +7,7 @@
 //! unit-testable without the dialog's widget surface. The dialog's tests
 //! keep exercising them through the re-exported names.
 
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 
 use crate::service::{self, FamilyInfo};
 
