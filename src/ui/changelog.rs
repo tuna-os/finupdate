@@ -32,7 +32,7 @@ pub enum SbomStatus {
     Loaded,
 }
 
-fn spawn_changelog_fetch(
+pub fn spawn_changelog_fetch(
     registry_uri: String,
     selected_tag: String,
     sender: ComponentSender<StatusView>,
