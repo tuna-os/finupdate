@@ -19,7 +19,7 @@ use std::time::Instant;
 use crate::app::{AppState, PreflightStatus};
 use crate::registry_client::ImageVersion;
 use crate::settings::Settings;
-use crate::ui::history_list::{get_sample_deployments, rebuild_history_list, MockDeployment};
+use crate::ui::history_list::{MockDeployment, get_sample_deployments, rebuild_history_list};
 use crate::ui::settings_io::{apply_auto_updates_setting, read_auto_updates_enabled};
 
 // Host introspection moved to `bootc_probe`; glob-imported so the call
