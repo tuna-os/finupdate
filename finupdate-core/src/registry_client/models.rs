@@ -263,15 +263,15 @@ impl Family {
 
 #[derive(Deserialize)]
 pub(crate) struct TokenResponse {
-    token: String,
+    pub(crate) token: String,
 }
 
 #[derive(Deserialize)]
 pub(crate) struct TagListResponse {
-    tags: Vec<String>,
+    pub(crate) tags: Vec<String>,
 }
 
 #[derive(Deserialize)]
 pub(crate) struct ManifestResponse {
-    annotations: Option<HashMap<String, String>>,
+    pub(crate) annotations: Option<HashMap<String, String>>,
 }

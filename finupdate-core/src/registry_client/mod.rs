@@ -759,7 +759,7 @@ async fn fetch_config_labels(
 
 /// True for tags that look like a 40-char lowercase commit sha — the form
 /// dakota-nvidia and many CI-driven images use exclusively.
-
+///
 async fn probe_config_created(
     client: &reqwest::Client,
     registry: &str,
