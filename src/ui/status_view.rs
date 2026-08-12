@@ -2841,7 +2841,7 @@ fn rebuild_history_list(
 /// the component was shutdown. Maybe you accidentally dropped a controller?".
 /// A late result arriving for a page the user has already navigated away from
 /// is normal, not exceptional — dropping it silently is the correct behaviour.
-
+///
 /// A `current → target` version pair for the What's New Stack list.
 ///
 /// Both call sites built this inline and identically; the duplication is why
