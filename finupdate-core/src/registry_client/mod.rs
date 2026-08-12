@@ -16,7 +16,7 @@ use std::collections::HashMap;
 mod models;
 mod tags;
 
-pub use models::{AvailableTag, Family, ImageVersion, RegistryError, KNOWN_FAMILIES};
+pub use models::{AvailableTag, Family, ImageVersion, KNOWN_FAMILIES, RegistryError};
 use models::{ManifestResponse, TagListResponse, TokenResponse};
 pub use tags::strip_date_suffix;
 use tags::{is_sha_only_tag, parse_dated_tag};
@@ -1229,9 +1229,11 @@ mod tests {
         // "open" alone (without nvidia) doesn't map to a published image.
         assert!(bluefin.select_image_for_features(&["open"]).is_none());
         // "dx" + "framework" isn't a real combination.
-        assert!(bluefin
-            .select_image_for_features(&["dx", "framework"])
-            .is_none());
+        assert!(
+            bluefin
+                .select_image_for_features(&["dx", "framework"])
+                .is_none()
+        );
     }
 
     #[test]
