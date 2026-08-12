@@ -9,7 +9,7 @@
 use relm4::prelude::*;
 use std::time::Instant;
 
-use super::bootc_probe::strip_date_suffix;
+use super::bootc_probe::{get_cached_bootc_status, strip_date_suffix};
 use super::status_view::{StatusView, StatusViewInput};
 use super::version_parse::parse_org_repo;
 use crate::settings::Settings;
