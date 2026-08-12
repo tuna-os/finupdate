@@ -32,7 +32,7 @@ pub struct MockDeployment {
     pub pinned: bool,
 }
 
-fn get_sample_deployments(_reboot_pending: bool) -> Vec<MockDeployment> {
+pub fn get_sample_deployments(_reboot_pending: bool) -> Vec<MockDeployment> {
     // Always try real data first; return empty if unavailable rather than
     // hardcoding Fedora-specific mock data that doesn't apply to other images.
     if let Some(ds) = get_real_deployments() {
@@ -41,7 +41,7 @@ fn get_sample_deployments(_reboot_pending: bool) -> Vec<MockDeployment> {
     Vec::new()
 }
 
-fn rebuild_history_list(
+pub fn rebuild_history_list(
     list_box: &gtk::ListBox,
     deployments: &[MockDeployment],
     expanded_id: Option<&str>,
