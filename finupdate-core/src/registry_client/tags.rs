@@ -22,7 +22,6 @@ pub(crate) fn is_sha_only_tag(tag: &str) -> bool {
 ///
 /// Used by `RegistryClient::probe_sha_tag_dates` to surface history for
 /// images that publish via sha-tagged manifests without dated tag names.
-
 /// Extract a `NaiveDate` from a dated image tag, accepting the four conventions
 /// observed across the bootc image families we support:
 ///
