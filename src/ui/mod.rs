@@ -10,6 +10,7 @@ pub mod log_view;
 pub mod preferences;
 pub mod rebase_dialog;
 pub mod segmented_progress;
+pub(crate) mod settings_io; // helper: auto-update settings read/write + timer toggle
 pub mod status_view;
 pub mod update_check_dialog;
 pub mod update_list;
