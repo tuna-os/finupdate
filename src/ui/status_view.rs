@@ -24,6 +24,7 @@ use crate::settings::Settings;
 // sites here — and the unit tests below — keep referring to these by
 // their bare names.
 use super::bootc_probe::*;
+use super::version_parse::parse_org_repo;
 use crate::ui::log_view::{LogView, LogViewInput};
 use crate::ui::segmented_progress::{SegmentedProgress, same_segment};
 use crate::ui::update_list::{UpdateList, UpdateListInput};
@@ -2905,24 +2906,6 @@ fn rebuild_history_list(
     }
 }
 
-fn parse_org_repo(uri: &str) -> Option<(String, String)> {
-    let clean_uri = if let Some(pos) = uri.find("docker://") {
-        &uri[pos + 9..]
-    } else {
-        uri
-    };
-    let parts: Vec<&str> = clean_uri.split('/').collect();
-    if parts.len() >= 3 {
-        let org = parts[1].to_string();
-        let repo = parts[2..].join("/");
-        Some((org, repo))
-    } else if parts.len() == 2 {
-        Some((parts[0].to_string(), parts[1].to_string()))
-    } else {
-        None
-    }
-}
-
 /// Spawn the registry/changelog fetch on a background thread.
 ///
 /// Every result is delivered with `input_sender().send(..)` rather than
@@ -3758,41 +3741,6 @@ LOGO=bluefin
         assert_eq!(name, "standalone");
         assert_eq!(tag, "latest");
         assert_eq!(org, "unknown");
-    }
-
-    // ── parse_org_repo ───────────────────────────────────────────────────
-
-    #[test]
-    fn parse_org_repo_ghcr_three_parts() {
-        let r = parse_org_repo("ghcr.io/ublue-os/bluefin");
-        assert_eq!(r, Some(("ublue-os".to_string(), "bluefin".to_string())));
-    }
-
-    #[test]
-    fn parse_org_repo_two_parts() {
-        // No registry prefix — treat as org/repo directly.
-        let r = parse_org_repo("ublue-os/bluefin");
-        assert_eq!(r, Some(("ublue-os".to_string(), "bluefin".to_string())));
-    }
-
-    #[test]
-    fn parse_org_repo_strips_docker_prefix() {
-        let r = parse_org_repo("docker://ghcr.io/ublue-os/bluefin");
-        assert_eq!(r, Some(("ublue-os".to_string(), "bluefin".to_string())));
-    }
-
-    #[test]
-    fn parse_org_repo_handles_nested_path() {
-        // GHCR allows nested paths like /org/sub/image. We keep everything
-        // past the first split as the repo so downstream code can construct
-        // a valid GitHub URL.
-        let r = parse_org_repo("ghcr.io/ublue-os/sub/bluefin");
-        assert_eq!(r, Some(("ublue-os".to_string(), "sub/bluefin".to_string())));
-    }
-
-    #[test]
-    fn parse_org_repo_rejects_single_segment() {
-        assert!(parse_org_repo("bluefin").is_none());
     }
 
     // ── get_real_deployments_from_json ───────────────────────────────────

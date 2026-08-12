@@ -13,3 +13,4 @@ pub mod segmented_progress;
 pub mod status_view;
 pub mod update_check_dialog;
 pub mod update_list;
+pub(crate) mod version_parse; // helper: pure image-ref parsing
