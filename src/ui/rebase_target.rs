@@ -22,7 +22,7 @@ use crate::service::{self, FamilyInfo};
 /// - **Indeterminate** — booted image unknown (bootc-status failed, no
 ///   os-release fallback). Button disabled, label asks the user to pick a
 ///   build instead.
-fn compute_stream_switch_action(
+pub(crate) fn compute_stream_switch_action(
     family: Option<&FamilyInfo>,
     selected_features: &[String],
     selected_stream: &str,
@@ -70,7 +70,7 @@ fn compute_stream_switch_action(
 ///
 /// Returns (selected_features, resolved_image). The stream is embedded in
 /// the ImageRef's tag field.
-fn resolve_dx_nvidia_with_stream(
+pub(crate) fn resolve_dx_nvidia_with_stream(
     family: &FamilyInfo,
     dx_on: bool,
     nvidia_on: bool,
@@ -116,7 +116,7 @@ fn resolve_dx_nvidia_with_stream(
 /// the Rebase button click handler so the bootc-switch ref matches what the
 /// preview shows.
 #[allow(dead_code)]
-fn resolve_dx_nvidia(
+pub(crate) fn resolve_dx_nvidia(
     family: &FamilyInfo,
     dx_on: bool,
     nvidia_on: bool,
@@ -158,7 +158,7 @@ fn resolve_dx_nvidia(
 /// or doesn't match the expected `{base}-{suffix}` shape. Conservative default —
 /// if we can't be sure, show everything off rather than mislead the user about
 /// what they're running.
-fn derive_initial_toggle_state(
+pub(crate) fn derive_initial_toggle_state(
     family: &FamilyInfo,
     image: Option<&service::ImageRef>,
 ) -> (bool, bool) {
@@ -178,7 +178,7 @@ fn derive_initial_toggle_state(
     (dx, nvidia)
 }
 
-fn days_in_month(date: NaiveDate) -> u32 {
+pub(crate) fn days_in_month(date: NaiveDate) -> u32 {
     let next = if date.month() == 12 {
         NaiveDate::from_ymd_opt(date.year() + 1, 1, 1)
     } else {
