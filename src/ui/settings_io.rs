@@ -7,7 +7,11 @@
 //! `bootc_probe` / `log_view` / `update_list` modules already follow this
 //! separation; settings I/O now does too.
 
-fn read_auto_updates_enabled() -> bool {
+use std::process::Command;
+
+use crate::settings::Settings;
+
+pub fn read_auto_updates_enabled() -> bool {
     let output = if crate::update_worker::is_flatpak() {
         Command::new("flatpak-spawn")
             .args(["--host", "systemctl", "is-enabled", "uupd.timer"])
@@ -28,7 +32,7 @@ fn read_auto_updates_enabled() -> bool {
     }
 }
 
-fn apply_auto_updates_setting(active: bool) {
+pub fn apply_auto_updates_setting(active: bool) {
     let mut settings = Settings::load();
     settings.auto_updates = active;
     settings.save();
