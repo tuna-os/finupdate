@@ -76,7 +76,7 @@ fn parse_bootc_progress(line: &str) -> Option<BootcProgress> {
 /// Splitting capture+parse out of `run_rebase` keeps the UI plumbing (timeouts,
 /// widget updates) free of subprocess details, and lets us unit-test
 /// [`parse_bootc_progress`] separately.
-async fn run_bootc_switch(
+pub(crate) async fn run_bootc_switch(
     full_ref: &str,
     progress_tx: tokio::sync::mpsc::UnboundedSender<BootcProgress>,
 ) -> Result<(), String> {
