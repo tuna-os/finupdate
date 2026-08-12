@@ -29,11 +29,11 @@ use std::sync::{Arc, Mutex};
 use crate::registry_client::{ImageVersion, strip_date_suffix};
 use crate::service::{self, FamilyInfo};
 use crate::ui::bootc_progress::{BootcProgress, run_bootc_switch};
-use crate::update_worker::is_flatpak;
 use crate::ui::rebase_target::{
     compute_stream_switch_action, days_in_month, derive_initial_toggle_state, resolve_dx_nvidia,
     resolve_dx_nvidia_with_stream,
 };
+use crate::update_worker::is_flatpak;
 
 /// Callback invoked when the user clicks "See changelog" inside the rebase
 /// dialog's selected-version panel. Receives the version tag; the app uses it
