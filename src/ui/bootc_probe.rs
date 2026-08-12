@@ -23,7 +23,7 @@ use std::sync::Mutex;
 use crate::registry_client::ImageVersion;
 use crate::settings::Settings;
 
-use super::status_view::MockDeployment;
+use super::history_list::MockDeployment;
 
 /// Read the current OS image name and variant from `/etc/os-release`.
 /// Tries `/run/host/etc/os-release` first for Flatpak compatibility.
