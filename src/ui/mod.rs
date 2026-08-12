@@ -4,8 +4,8 @@
 //! composed into the main app or reused across Bluefin utility apps.
 
 pub mod bootc_probe;
-pub mod changelog;
-pub(crate) mod bootc_progress; // helper: bootc switch progress parse + subprocess runner
+pub(crate) mod bootc_progress;
+pub mod changelog; // helper: bootc switch progress parse + subprocess runner
 pub mod host_actions;
 pub mod log_view;
 pub mod preferences;

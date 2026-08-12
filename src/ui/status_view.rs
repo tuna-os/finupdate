@@ -19,7 +19,7 @@ use std::time::Instant;
 use crate::app::{AppState, PreflightStatus};
 use crate::registry_client::ImageVersion;
 use crate::settings::Settings;
-use crate::ui::changelog::{spawn_changelog_fetch, SbomStatus};
+use crate::ui::changelog::{SbomStatus, spawn_changelog_fetch};
 use crate::ui::settings_io::{apply_auto_updates_setting, read_auto_updates_enabled};
 
 // Host introspection moved to `bootc_probe`; glob-imported so the call
