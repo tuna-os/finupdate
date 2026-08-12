@@ -1248,8 +1248,6 @@ fn with_access_key(label: &str) -> String {
     format!("_{escaped}")
 }
 
-
-
 // ── Rebase worker ────────────────────────────────────────────────────────────
 
 /// Run a switch. Call this for every confirmed switch, in every mode.
@@ -1694,15 +1692,7 @@ fn populate_family_switches(
     });
 }
 
-
-
-
-
-
-
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-
 
 fn inject_calendar_css() {
     let css = gtk::CssProvider::new();
