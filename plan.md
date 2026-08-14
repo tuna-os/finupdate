@@ -4,7 +4,7 @@ Updated 2026-07-26. The previous version of this file listed six task groups all
 marked `[x]`; every one of them predated the work below and several were no
 longer true. Treat this as the live picture.
 
-All builds and tests run on **himachal** (`~/dev/hanthor/finupdate`, toolbox
+All builds and tests run on the **build host** (`~/dev/finupdate`, toolbox
 `finupdate`, Fedora 43 / GTK 4.20.4 / libadwaita 1.8.6). The local machine is a
 lightweight VPS with GTK 4.14 and cannot build this crate.
 
@@ -91,7 +91,7 @@ installs via `install-libfinupdate.sh`, resolves through `pkg-config`, and
 
 ### 2. cc-panel end-to-end
 
-`wip/cc-panel-toolbox` on himachal holds a full gnome-control-center build
+`wip/cc-panel-toolbox` on the build host holds a full gnome-control-center build
 harness (`build-aux/test-cc-panel-in-toolbox.sh` plus dakota PR #743 patches),
 committed but unmerged. Needs validating and merging.
 
