@@ -6,6 +6,9 @@
 use adw::prelude::*;
 use relm4::prelude::*;
 
+use crate::ui::bootc_probe::{
+    detect_bootc_image_info, read_booted_image_summary, read_image_info,
+};
 use crate::ui::settings_io::apply_auto_updates_setting;
 
 use super::{StatusView, StatusViewOutput, allow_narrow};
@@ -14,6 +17,23 @@ pub(super) struct IdleSettings {
     pub(super) group: adw::PreferencesGroup,
     pub(super) advanced_group: adw::PreferencesGroup,
     pub(super) auto_update_switch: adw::SwitchRow,
+}
+
+pub(super) fn hero_title(image_info: Option<&str>) -> String {
+    image_info.map(|s| s.to_string()).unwrap_or_else(|| {
+        read_image_info()
+            .or_else(|| detect_bootc_image_info().map(|(title, _, _)| title))
+            .unwrap_or_else(|| "System Image".to_string())
+    })
+}
+
+pub(super) fn idle_subtitle(reboot_pending: bool, last_update_text: Option<&str>) -> String {
+    if reboot_pending {
+        return "Reboot to update".to_string();
+    }
+    read_booted_image_summary()
+        .or_else(|| last_update_text.map(|s| s.to_string()))
+        .unwrap_or_else(|| "Current image".to_string())
 }
 
 pub(super) fn build_settings(
