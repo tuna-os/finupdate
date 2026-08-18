@@ -21,7 +21,9 @@ use crate::registry_client::ImageVersion;
 use crate::settings::Settings;
 use crate::ui::changelog::{SbomStatus, spawn_changelog_fetch};
 use crate::ui::history_list::{MockDeployment, get_sample_deployments, rebuild_history_list};
-use crate::ui::settings_io::{apply_auto_updates_setting, read_auto_updates_enabled};
+use crate::ui::settings_io::read_auto_updates_enabled;
+
+mod idle;
 
 // Host introspection moved to `bootc_probe`; glob-imported so the call
 // sites here — and the unit tests below — keep referring to these by
@@ -1253,50 +1255,11 @@ impl SimpleComponent for StatusView {
         update_banner_group.set_visible(false);
         idle_page.add(&update_banner_group);
 
-        // Boxed List Settings Card (Left sidebar settings style)
-        let check_row = adw::ActionRow::builder()
-            .title("_Check for updates")
-            .subtitle("System image, Flatpak, Homebrew, and Distrobox")
-            .use_underline(true)
-            .build();
-        let check_btn = gtk::Button::with_label("Check");
-        check_btn.set_valign(gtk::Align::Center);
-        let check_sender = sender.output_sender().clone();
-        check_btn.connect_clicked(move |_| {
-            let _ = check_sender.send(StatusViewOutput::OpenCheckDialog);
-        });
-        check_row.add_suffix(&check_btn);
-        allow_narrow(&check_row);
+        // Idle-only actions are built in the idle state module. Keep only the
+        // shared handles that the component updates after initialization.
+        let idle_settings = idle::build_settings(&sender, auto_updates_enabled);
+        let auto_update_switch = idle_settings.auto_update_switch;
 
-        // adw::SwitchRow (rather than ActionRow + Switch suffix) so the
-        // entire row is the click target — matches gnome-control-center's
-        // Privacy / Sharing toggles. Also gives us correct AT-SPI semantics
-        // (it announces as a switch, not a generic list item).
-        let auto_row = adw::SwitchRow::builder()
-            .title("_Automatic updates")
-            .subtitle("Refresh in the background on the systemd timer")
-            .use_underline(true)
-            .active(auto_updates_enabled)
-            .build();
-        allow_narrow(&auto_row);
-        let auto_update_switch = auto_row.clone();
-        auto_row.connect_active_notify(move |row| {
-            apply_auto_updates_setting(row.is_active());
-        });
-
-        // ── Main page is intentionally minimal ────────────────────────────
-        // Per user direction (macOS Software Update model): only Check +
-        // Automatic Updates on the main view. Image Source / Image History /
-        // Powerwash / Factory Reset all move to the hamburger menu (still
-        // one click away). Keeps the visual focus on "do I need to update?".
-        //
-        // The widgets below (source_row, history_row, powerwash_row,
-        // factory_row, registry_row_sub, images_count_label) are still
-        // constructed because the model fields reference them and update()
-        // mutates their labels — but they're NOT added to idle_page, so they
-        // never render on the main view. They live as orphaned widgets that
-        // accept set_label calls; cheap and avoids a bigger refactor of the
-        // update() method's text-mutation paths.
         let registry_row_sub = gtk::Label::new(Some(&format!(
             "{}:{}",
             initial_registry_uri, initial_selected_tag
@@ -1305,44 +1268,8 @@ impl SimpleComponent for StatusView {
         let images_count_label = gtk::Label::new(Some("3 versions"));
         images_count_label.add_css_class("dim-label");
 
-        let settings_card = adw::PreferencesGroup::new();
-        settings_card.add(&check_row);
-        settings_card.add(&auto_row);
-        idle_page.add(&settings_card);
-
-        // Single "Advanced…" row at the bottom — opens the Advanced dialog
-        // (which hosts Image Source, Image History, Rebase, Powerwash,
-        // Factory Reset, and the Updates / Network settings groups).
-        // gnome-control-center doesn't bury panel-specific actions in the
-        // hamburger menu; we follow the same convention.
-        let advanced_row = adw::ActionRow::builder()
-            .title("_Advanced")
-            // Must match what the dialog actually contains. It previously promised
-            // "Image source, history, rollback" — none of which are in there;
-            // the dialog has Automatic Updates, Network and Reset. Advertising
-            // features that are not behind the row reads as a broken app.
-            .subtitle("Automatic updates, network, and reset")
-            .activatable(true)
-            .use_underline(true)
-            .build();
-        // Upcast to gtk::Widget before setting the role — see the identical
-        // note in `ui::preferences`: libadwaita 0.9.2 no longer lists
-        // gtk::Accessible among AdwActionRow's interfaces, but gtk::Widget
-        // implements it, so the role is preserved rather than dropped.
-        advanced_row
-            .upcast_ref::<gtk::Widget>()
-            .set_accessible_role(gtk::AccessibleRole::Button);
-        allow_narrow(&advanced_row);
-        let adv_chev = gtk::Image::from_icon_name("go-next-symbolic");
-        adv_chev.add_css_class("dim-label");
-        advanced_row.add_suffix(&adv_chev);
-        let advanced_sender = sender.output_sender().clone();
-        advanced_row.connect_activated(move |_| {
-            let _ = advanced_sender.send(StatusViewOutput::OpenAdvanced);
-        });
-        let advanced_group = adw::PreferencesGroup::new();
-        advanced_group.add(&advanced_row);
-        idle_page.add(&advanced_group);
+        idle_page.add(&idle_settings.group);
+        idle_page.add(&idle_settings.advanced_group);
 
         // ── Image Source Subpage (HIG-aligned) ────────────────────────────
         // adw::PreferencesPage + PreferencesGroup with canonical Adwaita
