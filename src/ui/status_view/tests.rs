@@ -1,7 +1,7 @@
 //! Unit tests for the status view (moved out of the component file).
 
 use super::*;
-use serde_json::json;
+use serde_json::{Value, json};
 
 // ── parse_booted_image_summary ───────────────────────────────────────
 // Pure JSON-shape tests for the hero-row subtitle helper. The bootc
