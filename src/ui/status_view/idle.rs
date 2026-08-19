@@ -6,9 +6,7 @@
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use crate::ui::bootc_probe::{
-    detect_bootc_image_info, read_booted_image_summary, read_image_info,
-};
+use crate::ui::bootc_probe::{detect_bootc_image_info, read_booted_image_summary, read_image_info};
 use crate::ui::settings_io::apply_auto_updates_setting;
 
 use super::{StatusView, StatusViewOutput, allow_narrow};
