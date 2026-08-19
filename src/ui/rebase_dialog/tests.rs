@@ -2,9 +2,9 @@
 
 use std::sync::Once;
 
+use super::switches::resolve_target_ref;
 use crate::service::{self, FamilyInfo};
 use crate::ui::rebase_target::{derive_initial_toggle_state, resolve_dx_nvidia};
-use super::switches::resolve_target_ref;
 
 static INIT: Once = Once::new();
 

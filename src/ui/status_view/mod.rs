@@ -620,7 +620,8 @@ impl SimpleComponent for StatusView {
         idle_page.add(&idle_settings.advanced_group);
 
         // ── Image Source Subpage ─────────────────────────────────────────
-        let source_widgets = build_source_page(&sender, &initial_registry_uri, &initial_selected_tag);
+        let source_widgets =
+            build_source_page(&sender, &initial_registry_uri, &initial_selected_tag);
 
         // ── Version History Subpage ──────────────────────────────────────
         let history_page = adw::PreferencesPage::new();

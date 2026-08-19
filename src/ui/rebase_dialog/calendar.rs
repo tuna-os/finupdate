@@ -9,9 +9,7 @@ use std::rc::Rc;
 
 use crate::registry_client::{ImageVersion, strip_date_suffix};
 use crate::service::{self, FamilyInfo};
-use crate::ui::rebase_target::{
-    compute_stream_switch_action, days_in_month,
-};
+use crate::ui::rebase_target::{compute_stream_switch_action, days_in_month};
 
 use super::OnShowChangelog;
 use super::execution::{run_rebase, with_access_key};

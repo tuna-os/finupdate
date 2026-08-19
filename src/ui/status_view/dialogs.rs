@@ -42,8 +42,7 @@ impl StatusView {
                         settings_snapshot.dry_run,
                         settings_snapshot.dev_mode
                     );
-                    let toast =
-                        adw::Toast::new("Powerwash staged (dry-run, no commands run)");
+                    let toast = adw::Toast::new("Powerwash staged (dry-run, no commands run)");
                     toast_overlay.add_toast(toast);
                 } else {
                     crate::ui::host_actions::run_powerwash(&toast_overlay);
@@ -99,8 +98,7 @@ impl StatusView {
                         settings_snapshot.dry_run,
                         settings_snapshot.dev_mode
                     );
-                    let toast =
-                        adw::Toast::new("Factory reset queued (dry-run, no commands run)");
+                    let toast = adw::Toast::new("Factory reset queued (dry-run, no commands run)");
                     toast_overlay.add_toast(toast);
                 } else {
                     crate::ui::host_actions::run_bootc_install_reset(

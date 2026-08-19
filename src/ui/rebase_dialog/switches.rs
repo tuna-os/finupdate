@@ -7,9 +7,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use crate::service::{self, FamilyInfo};
-use crate::ui::rebase_target::{
-    derive_initial_toggle_state, resolve_dx_nvidia_with_stream,
-};
+use crate::ui::rebase_target::{derive_initial_toggle_state, resolve_dx_nvidia_with_stream};
 
 /// Detect the booted (or mocked) image's Family and render one SwitchRow per
 /// atomic feature. As switches toggle, recompute the target image and write
