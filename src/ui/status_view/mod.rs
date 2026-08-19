@@ -238,24 +238,11 @@ pub struct StatusView {
 
 impl StatusView {
     fn hero_title(&self) -> String {
-        self.image_info.clone().unwrap_or_else(|| {
-            read_image_info()
-                .or_else(|| detect_bootc_image_info().map(|(title, _, _)| title))
-                .unwrap_or_else(|| "System Image".to_string())
-        })
+        idle::hero_title(self.image_info.as_deref())
     }
 
     fn idle_subtitle(&self) -> String {
-        // Per user direction: "Booted 3 days ago" wasn't insightful. Prefer
-        // "VERSION · shaXXXXXXXX" from bootc-status (read_booted_image_summary)
-        // so the user can see exactly which build is on disk. Falls back
-        // through the cached last-update text, then a generic message.
-        if self.reboot_pending {
-            return "Reboot to update".to_string();
-        }
-        read_booted_image_summary()
-            .or_else(|| self.last_update_text.clone())
-            .unwrap_or_else(|| "Current image".to_string())
+        idle::idle_subtitle(self.reboot_pending, self.last_update_text.as_deref())
     }
 
     fn refresh_idle_description(&self) {
