@@ -7,6 +7,10 @@
 //! - Complete: Success status page with reboot option
 //! - UpToDate: "You're already up to date" status page
 //! - Error: Error status page with retry option
+//!
+//! Each state's widget construction lives in a sibling sub-module
+//! (`idle.rs`, `updating.rs`, `complete.rs`, `uptodate.rs`, `error.rs`);
+//! `update()` stays here as a thin router between them.
 
 use adw::prelude::*;
 use relm4::prelude::*;
@@ -22,18 +26,25 @@ use crate::ui::history_list::{MockDeployment, get_sample_deployments, rebuild_hi
 use crate::ui::settings_io::read_auto_updates_enabled;
 
 mod changelog_page;
+mod complete;
 mod dialogs;
+mod error;
 mod helpers;
 mod idle;
 mod source_page;
 mod updating;
+mod uptodate;
 
 #[cfg(test)]
 mod tests;
 
+use complete::build_complete_page;
+use error::build_error_page;
 use helpers::{VERSION_MAX_CHARS, allow_narrow, version_change_class, version_diff_box};
+use idle::IdleWidgets;
 use source_page::build_source_page;
 use updating::build_updating_page;
+use uptodate::build_uptodate_page;
 
 // Host introspection moved to `bootc_probe`; glob-imported so the call
 // sites here — and the unit tests — keep referring to these by their bare names.
@@ -230,6 +241,12 @@ pub struct StatusView {
     /// is a specific build (date or sha) rather than a floating stream.
     pin_group: adw::PreferencesGroup,
     pin_row: adw::ActionRow,
+    /// Success status page with reboot option.
+    complete_page: adw::StatusPage,
+    /// "You're already up to date" status page.
+    uptodate_page: adw::StatusPage,
+    /// Error status page with retry option.
+    error_page: adw::StatusPage,
 
     // Dialog rollback state
     rollback_target: Option<MockDeployment>,
@@ -347,87 +364,17 @@ impl SimpleComponent for StatusView {
                     },
 
                     // ─── Complete page ──────────────────────────────────────────
-                    add_child = &adw::StatusPage {
-                        set_icon_name: Some("object-select-symbolic"),
-                        set_title: "Update Complete",
-                        set_description: Some("Restart to apply changes."),
-
-                        #[wrap(Some)]
-                        set_child = &gtk::Box {
-                            set_orientation: gtk::Orientation::Vertical,
-                            set_halign: gtk::Align::Center,
-                            set_spacing: 8,
-
-                            gtk::Button {
-                                set_label: "Restart…",
-                                add_css_class: "suggested-action",
-                                add_css_class: "pill",
-                                connect_clicked[sender] => move |_| {
-                                    sender.output(StatusViewOutput::Reboot).unwrap();
-                                },
-                            },
-
-                            gtk::Button {
-                                set_label: "Restart Later",
-                                add_css_class: "flat",
-                                connect_clicked[sender] => move |_| {
-                                    sender.input(StatusViewInput::StateChanged(AppState::Idle));
-                                },
-                            },
-                        },
-                    } -> {
+                    add_child = &model.complete_page.clone() -> adw::StatusPage {} -> {
                         set_name: "complete",
                     },
 
                     // ─── Up to date page ────────────────────────────────────────
-                    add_child = &adw::StatusPage {
-                        set_icon_name: Some("emblem-ok-symbolic"),
-                        set_title: "Up to Date",
-                        set_description: Some("No updates available."),
-
-                        #[wrap(Some)]
-                        set_child = &gtk::Button {
-                            set_label: "Done",
-                            add_css_class: "pill",
-                            set_halign: gtk::Align::Center,
-                            connect_clicked[sender] => move |_| {
-                                sender.input(StatusViewInput::StateChanged(AppState::Idle));
-                            },
-                        },
-                    } -> {
+                    add_child = &model.uptodate_page.clone() -> adw::StatusPage {} -> {
                         set_name: "up_to_date",
                     },
 
                     // ─── Error page ─────────────────────────────────────────────
-                    add_child = &adw::StatusPage {
-                        set_icon_name: Some("dialog-warning-symbolic"),
-                        set_title: "Update Failed",
-                        set_description: Some("Something went wrong."),
-
-                        #[wrap(Some)]
-                        set_child = &gtk::Box {
-                            set_orientation: gtk::Orientation::Vertical,
-                            set_halign: gtk::Align::Center,
-                            set_spacing: 8,
-
-                            gtk::Button {
-                                set_label: "Retry",
-                                add_css_class: "suggested-action",
-                                add_css_class: "pill",
-                                connect_clicked[sender] => move |_| {
-                                    sender.output(StatusViewOutput::StartUpdate).unwrap();
-                                },
-                            },
-
-                            gtk::Button {
-                                set_label: "Dismiss",
-                                add_css_class: "flat",
-                                connect_clicked[sender] => move |_| {
-                                    sender.input(StatusViewInput::StateChanged(AppState::Idle));
-                                },
-                            },
-                        },
-                    } -> {
+                    add_child = &model.error_page.clone() -> adw::StatusPage {} -> {
                         set_name: "error",
                     },
                 },
@@ -457,154 +404,29 @@ impl SimpleComponent for StatusView {
             .or_else(|| initial_last_update.clone())
             .unwrap_or_else(|| "Current image".to_string());
 
-        let idle_page = adw::PreferencesPage::new();
-
-        let hero_group = adw::PreferencesGroup::new();
-        let hero_row = adw::ActionRow::builder()
-            .title(initial_image_info.as_deref().unwrap_or("System Image"))
-            .subtitle(&initial_subtitle)
-            .subtitle_lines(2)
-            .subtitle_selectable(true)
-            .title_selectable(true)
-            .build();
-        hero_row.set_activatable(false);
-
-        let hero_icon = match read_logo_icon_name() {
-            HeroLogo::Themed(name) => {
-                let img = gtk::Image::from_icon_name(&name);
-                img.add_css_class("accent");
-                img
-            }
-            HeroLogo::File(path) => gtk::Image::from_file(&path),
-        };
-        hero_icon.set_pixel_size(32);
-        hero_row.add_prefix(&hero_icon);
-
-        let hero_change_btn = gtk::Button::with_label("Change");
-        hero_change_btn.add_css_class("flat");
-        hero_change_btn.set_tooltip_text(Some("Change image variant or stream"));
-        hero_change_btn.set_valign(gtk::Align::Center);
-        let change_sender = sender.output_sender().clone();
-        hero_change_btn.connect_clicked(move |_| {
-            change_sender.emit(StatusViewOutput::ShowRebase);
-        });
-        hero_row.add_suffix(&hero_change_btn);
-
-        let status_pill = gtk::Label::new(Some("Checking"));
-        status_pill.add_css_class("caption");
-        status_pill.add_css_class("dim-label");
-        status_pill.set_valign(gtk::Align::Center);
-        hero_row.add_suffix(&status_pill);
-
-        let hero_schedule_btn = gtk::Button::with_label("Restart Tonight");
-        hero_schedule_btn.set_valign(gtk::Align::Center);
-        hero_schedule_btn.set_visible(false);
-        let schedule_sender = sender.input_sender().clone();
-        hero_schedule_btn.connect_clicked(move |_| {
-            schedule_sender.emit(StatusViewInput::ScheduleRebootTonight);
-        });
-        hero_row.add_suffix(&hero_schedule_btn);
-
-        let hero_action_btn = gtk::Button::with_label("Install");
-        hero_action_btn.add_css_class("suggested-action");
-        hero_action_btn.set_valign(gtk::Align::Center);
-        hero_action_btn.set_visible(false);
-        let hero_action_sender = sender.input_sender().clone();
-        hero_action_btn.connect_clicked(move |_| {
-            hero_action_sender.emit(StatusViewInput::HeroActionClicked);
-        });
-        hero_row.add_suffix(&hero_action_btn);
-
-        hero_group.add(&hero_row);
-        idle_page.add(&hero_group);
-
-        // ── Pin group ─────────────────────────────────────────────────────
-        let pin_group = adw::PreferencesGroup::new();
-        let pin_row = adw::ActionRow::builder()
-            .title("Pinned to a specific build")
-            .subtitle("Automatic updates are paused. Unpin to resume.")
-            .build();
-        pin_row.set_activatable(false);
-        let pin_icon = gtk::Image::from_icon_name("emblem-important-symbolic");
-        pin_icon.set_pixel_size(20);
-        pin_icon.add_css_class("warning");
-        pin_row.add_prefix(&pin_icon);
-
-        let unpin_btn = gtk::Button::with_label("Unpin");
-        unpin_btn.add_css_class("suggested-action");
-        unpin_btn.set_valign(gtk::Align::Center);
-        let unpin_sender = sender.input_sender().clone();
-        unpin_btn.connect_clicked(move |_| {
-            unpin_sender.emit(StatusViewInput::UnpinToStream("latest".to_string()));
-        });
-        pin_row.add_suffix(&unpin_btn);
-        pin_group.add(&pin_row);
-        pin_group.set_visible(is_pinned_tag(&initial_selected_tag));
-        idle_page.add(&pin_group);
-
-        // Banner group
-        let update_banner_group = adw::PreferencesGroup::new();
-        let banner_title_row = adw::ActionRow::builder()
-            .title("Update available")
-            .subtitle("A new system image is ready to install.")
-            .build();
-        banner_title_row.set_activatable(false);
-
-        let banner_icon = gtk::Image::from_icon_name("software-update-available-symbolic");
-        banner_icon.set_pixel_size(24);
-        banner_icon.add_css_class("accent");
-        banner_title_row.add_prefix(&banner_icon);
-
-        let banner_whats_new_btn = gtk::Button::from_icon_name("view-list-symbolic");
-        banner_whats_new_btn.add_css_class("flat");
-        banner_whats_new_btn.add_css_class("circular");
-        banner_whats_new_btn.set_tooltip_text(Some("What's new in this update"));
-        banner_whats_new_btn.set_valign(gtk::Align::Center);
-        let initial_selected_tag_3 = initial_selected_tag.clone();
-        let whats_new_sender_2 = sender.input_sender().clone();
-        banner_whats_new_btn.connect_clicked(move |_| {
-            let ver = initial_selected_tag_3.clone();
-            whats_new_sender_2.emit(StatusViewInput::SelectChangelogVersion(ver));
-        });
-
-        let banner_install_btn = gtk::Button::with_label("Install");
-        banner_install_btn.add_css_class("accent");
-        banner_install_btn.set_valign(gtk::Align::Center);
-        let install_sender_2 = sender.output_sender().clone();
-        banner_install_btn.connect_clicked(move |_| {
-            let _ = install_sender_2.send(StatusViewOutput::StartUpdate);
-        });
-
-        let banner_restart_btn = gtk::Button::with_label("Restart");
-        banner_restart_btn.add_css_class("accent");
-        banner_restart_btn.set_valign(gtk::Align::Center);
-        let restart_sender = sender.output_sender().clone();
-        banner_restart_btn.connect_clicked(move |_| {
-            let _ = restart_sender.send(StatusViewOutput::Reboot);
-        });
-
-        let banner_discard_btn = gtk::Button::with_label("Discard");
-        banner_discard_btn.add_css_class("flat");
-        let discard_sender = sender.input_sender().clone();
-        banner_discard_btn.connect_clicked(move |_| {
-            discard_sender.emit(StatusViewInput::DismissBanner);
-        });
-
-        banner_title_row.add_suffix(&banner_whats_new_btn);
-        banner_title_row.add_suffix(&banner_install_btn);
-        banner_title_row.add_suffix(&banner_restart_btn);
-        banner_title_row.add_suffix(&banner_discard_btn);
-        update_banner_group.add(&banner_title_row);
-        update_banner_group.set_visible(false);
-        idle_page.add(&update_banner_group);
-
-        let idle_settings = idle::build_settings(&sender, auto_updates_enabled);
-        let auto_update_switch = idle_settings.auto_update_switch;
-        let images_count_label = gtk::Label::new(Some("3 versions"));
-        images_count_label.add_css_class("dim-label");
-
-        idle_page.add(&idle_settings.group);
-        idle_page.add(&idle_settings.advanced_group);
+        let IdleWidgets {
+            page: idle_page,
+            hero_row,
+            status_pill,
+            hero_action_btn,
+            hero_schedule_btn,
+            update_banner_group,
+            banner_title_row,
+            banner_install_btn,
+            banner_whats_new_btn,
+            banner_restart_btn,
+            banner_discard_btn,
+            auto_update_switch,
+            pin_group,
+            pin_row,
+            images_count_label,
+        } = idle::build_idle_page(
+            &sender,
+            auto_updates_enabled,
+            &initial_selected_tag,
+            initial_image_info.clone(),
+            initial_subtitle,
+        );
 
         // ── Image Source Subpage ─────────────────────────────────────────
         let source_widgets =
@@ -673,6 +495,11 @@ impl SimpleComponent for StatusView {
         let updating_widgets = build_updating_page(&sender, &log_view, &update_list);
         toast_overlay.set_child(Some(&updating_widgets.updating_content));
 
+        // ── Complete / Up-to-date / Error pages ──────────────────────────
+        let complete_page = build_complete_page(&sender);
+        let uptodate_page = build_uptodate_page(&sender);
+        let error_page = build_error_page(&sender);
+
         spawn_changelog_fetch(
             initial_registry_uri.clone(),
             initial_selected_tag.clone(),
@@ -731,6 +558,9 @@ impl SimpleComponent for StatusView {
             changelog_install_bar: changelog_install_bar.clone(),
             pin_group: pin_group.clone(),
             pin_row: pin_row.clone(),
+            complete_page,
+            uptodate_page,
+            error_page,
             rollback_target: None,
         };
 
