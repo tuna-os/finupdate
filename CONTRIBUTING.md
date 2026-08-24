@@ -183,7 +183,7 @@ Quick sanity checks:
 
 ## Getting Help
 
-- Open an issue at https://github.com/castrojo/finupdate/issues
+- Open an issue at https://github.com/tuna-os/finupdate/issues
 - Reference the [GNOME Developer Documentation](https://developer.gnome.org/)
 - Reference the [relm4 book](https://relm4.org/book/stable/)
 - Reference the [gtk4-rs docs](https://gtk-rs.org/gtk4-rs/stable/latest/docs/gtk4/)

@@ -66,8 +66,8 @@ launch_finupdate() {
     # Assumes the Devel Flatpak is installed (just flatpak / just flatpak-run).
     # Don't restart if it's already running — the user may be staging a
     # specific subpage state (e.g. rebase dialog open).
-    if ! host_run pgrep -f "io.github.castrojo.Finupdate.Devel" >/dev/null 2>&1; then
-        host_run flatpak run io.github.castrojo.Finupdate.Devel &
+    if ! host_run pgrep -f "org.tunaos.finupdate.Devel" >/dev/null 2>&1; then
+        host_run flatpak run org.tunaos.finupdate.Devel &
         sleep 4
     fi
 }
