@@ -4,5 +4,5 @@
   "description": "Shows a circular progress indicator in the top panel while system updates are running.",
   "shell-version": ["45", "46", "47", "48"],
   "version": 1,
-  "url": "https://github.com/castrojo/finupdate"
+  "url": "https://github.com/tuna-os/finupdate"
 }
