@@ -147,6 +147,8 @@ Run through the HIG compliance checklist in [PATTERNS.md](PATTERNS.md#6-hig-comp
 Quick sanity checks:
 - [ ] `toolbox run --container finupdate cargo build` compiles cleanly with no warnings
 - [ ] `toolbox run --container finupdate cargo clippy` passes
+- [ ] `just test` (or `cargo test --all-targets`) passes all unit tests
+- [ ] `just gui-test` passes Broadway GUI verification
 - [ ] App launches and the new feature works visually
 - [ ] Dark mode looks correct
 - [ ] Keyboard navigation works

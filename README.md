@@ -171,6 +171,17 @@ When running in Flatpak, the app uses `flatpak-spawn --host` to execute commands
 | `RUST_LOG=trace` | Full trace output |
 | `GTK_DEBUG=interactive` | GTK Inspector |
 
+### Testing
+
+```bash
+# Run unit tests (Cargo or just)
+cargo test --all-targets
+just test
+
+# Run Broadway GUI test suite
+just gui-test
+```
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow and guidelines.
