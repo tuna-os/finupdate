@@ -1,0 +1,66 @@
+name: Screenshots
+
+# Regenerates the screenshots the AppStream metainfo points at, so what an app
+# store shows is produced by the current build rather than hand-uploaded once
+# and left to rot.
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "finupdate-core/**"
+      - "data/org.tunaos.finupdate.metainfo.xml.in"
+      - "tests/visual-audit/**"
+      - ".github/workflows/screenshots.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:45
+    env:
+      CARGO_TERM_COLOR: never
+    steps:
+      - name: Install git first
+        run: dnf -y install git
+
+      - uses: actions/checkout@v7
+
+      # Same set the CI job builds against.
+      - name: Install build dependencies
+        run: |
+          dnf install -y \
+            gtk4-devel libadwaita-devel pango-devel cairo-devel \
+            openssl-devel gcc pkgconfig tar curl
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build the app
+        run: cargo build --bin finupdate
+
+      # A screenshot of a stale binary is worse than no screenshot, so drop
+      # anything committed before capturing rather than risk shipping it.
+      - name: Drop committed images so only this run's output ships
+        run: rm -f docs/screenshots/*.png
+
+      - name: Prepare a fake bootc host
+        run: |
+          tests/visual-audit/mock-host.sh >> "$GITHUB_ENV"
+          cat "$GITHUB_ENV"
+
+      # TODO: switch to @main once tuna-os/flatpak-index#35 merges. Pinned to
+      # the branch so this workflow is testable before that lands.
+      - uses: tuna-os/flatpak-index/.github/actions/capture-screenshots@claude/sweet-gauss-5h3cma
+        with:
+          command: target/debug/finupdate
+          name: main-window
+          out-dir: docs/screenshots
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: screenshots
+          path: docs/screenshots/
