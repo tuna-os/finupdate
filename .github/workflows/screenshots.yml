@@ -72,9 +72,7 @@ jobs:
           IMAGE_TAG="stable"
           OSRELEASE
 
-      # TODO: switch to @main once tuna-os/flatpak-index#35 merges. Pinned to
-      # the branch so this workflow is testable before that lands.
-      - uses: tuna-os/flatpak-index/.github/actions/capture-screenshots@claude/sweet-gauss-5h3cma
+      - uses: tuna-os/flatpak-index/.github/actions/capture-screenshots@main
         with:
           command: target/debug/finupdate
           name: main-window
