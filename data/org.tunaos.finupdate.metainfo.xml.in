@@ -25,6 +25,18 @@
     <name>Project Bluefin</name>
   </developer>
 
+  <!-- 1000x700 is Flathub's maximum for a non-HiDPI screenshot. Regenerated
+       by .github/workflows/screenshots.yml, which drives the production code
+       path against a mocked host so no developer-mode banner appears. The
+       image is committed deliberately rather than pushed by CI, so a bad
+       capture cannot publish itself unreviewed. -->
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/tuna-os/finupdate/main/docs/screenshots/main-window.png</image>
+      <caption>The update overview, with automatic updates switched on</caption>
+    </screenshot>
+  </screenshots>
+
   <branding>
     <color type="primary" scheme_preference="light">#99c1f1</color>
     <color type="primary" scheme_preference="dark">#1a5fb4</color>
