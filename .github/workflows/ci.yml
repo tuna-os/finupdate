@@ -14,7 +14,7 @@ jobs:
       CARGO_HOME: /opt/cargo
       RUSTUP_HOME: /opt/rustup
     container:
-      image: fedora:45
+      image: fedora:46
 
     steps:
       - name: Checkout code
