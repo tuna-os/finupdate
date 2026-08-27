@@ -52,6 +52,26 @@ jobs:
           tests/visual-audit/mock-host.sh >> "$GITHUB_ENV"
           cat "$GITHUB_ENV"
 
+      # The first capture's hero row read "Fedora Linux 45 (Container Image
+      # Prerelease)": RegistryClient falls back to /etc/os-release when it
+      # cannot reach bootc, and picked up the CI container's own -- the build
+      # environment showing through on an app whose subject is Bluefin.
+      #
+      # Deliberately NOT in mock-host.sh: that script is run by developers on
+      # their own machines, and writing /etc/os-release there would be
+      # destructive. This step only ever runs in a throwaway container.
+      - name: Make the container look like the system this app targets
+        run: |
+          cat > /etc/os-release <<'OSRELEASE'
+          NAME="Bluefin"
+          PRETTY_NAME="Bluefin (Version 43)"
+          ID=bluefin
+          ID_LIKE=fedora
+          VERSION_ID=43
+          IMAGE_REF="ghcr.io/ublue-os/bluefin:stable"
+          IMAGE_TAG="stable"
+          OSRELEASE
+
       # TODO: switch to @main once tuna-os/flatpak-index#35 merges. Pinned to
       # the branch so this workflow is testable before that lands.
       - uses: tuna-os/flatpak-index/.github/actions/capture-screenshots@claude/sweet-gauss-5h3cma
