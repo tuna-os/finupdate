@@ -620,4 +620,13 @@ mod tests {
 
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_read_config_returns_defaults_on_invalid_or_missing_file() {
+        // read_config reads /etc/uupd/config.json which normally does not exist in test envs;
+        // it should fall back to UupdConfig::default().
+        let cfg = read_config();
+        assert_eq!(cfg, UupdConfig::default());
+    }
 }
+
