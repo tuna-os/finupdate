@@ -629,4 +629,3 @@ mod tests {
         assert_eq!(cfg, UupdConfig::default());
     }
 }
-
