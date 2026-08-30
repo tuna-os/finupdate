@@ -17,10 +17,11 @@ The flatpak is the canonical "I want to try the app" path. It works on any GNOME
 
 ### As a user — install the published Flatpak
 
-> Once finupdate ships to Flathub or a Bluefin Flatpak remote, this becomes a one-liner. Until then, see "Build from source" below.
+Finupdate is published for x86_64 and aarch64 on the TunaOS Flatpak remote:
 
 ```sh
-flatpak install <remote> org.tunaos.finupdate
+flatpak remote-add --if-not-exists tuna-os https://tunaos.org/flatpak/tuna-os.flatpakrepo
+flatpak install tuna-os org.tunaos.finupdate
 flatpak run org.tunaos.finupdate
 ```
 
@@ -42,13 +43,14 @@ just run                # or: flatpak run org.tunaos.finupdate.Devel
 just dock
 ```
 
-The dev flatpak uses a different application ID (`…Finupdate.Devel`) so it can coexist with a stable build.
+The dev Flatpak uses a different application ID
+(`org.tunaos.finupdate.Devel`) so it can coexist with a stable build.
 
 ### Verifying it works
 
 ```sh
 flatpak list --user | grep -i finupdate
-# org.tunaos.finupdate.Devel    0.1.0    master
+# Finupdate    org.tunaos.finupdate    …    tuna-os
 ```
 
 Logs go to the journal — `journalctl --user -f` while the app runs surfaces backend traces.
