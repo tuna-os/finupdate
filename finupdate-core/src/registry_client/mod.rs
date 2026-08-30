@@ -13,6 +13,7 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use std::collections::HashMap;
 
+mod detection;
 mod models;
 mod tags;
 
@@ -69,7 +70,7 @@ impl RegistryClient {
     /// 3. `bootc status --json` (most reliable on a real host).
     /// 4. `/etc/os-release` fallback (Flatpak-friendly via flatpak-spawn).
     pub async fn detect() -> Option<Self> {
-        Self::detect_with_settings(&crate::settings::Settings::load()).await
+        detection::detect().await
     }
 
     /// Like [`Self::detect`], but reads the mock-identity override from the
@@ -77,183 +78,11 @@ impl RegistryClient {
     /// (and any future preferences UI) drive detection without round-tripping
     /// through settings.json.
     pub async fn detect_with_settings(settings: &crate::settings::Settings) -> Option<Self> {
-        println!("[debug] RegistryClient::detect_with_settings()");
-
-        if let Some(mock) = settings.mock_identity.as_ref() {
-            let stream = strip_date_suffix(&mock.tag).unwrap_or_else(|| mock.tag.clone());
-            println!(
-                "[debug] RegistryClient::detect_with_settings() mock_identity = {}/{}/{} stream={}",
-                mock.registry, mock.org, mock.image, stream
-            );
-            return Some(Self::new(&mock.registry, &mock.org, &mock.image, &stream));
-        }
-
-        // FINUPDATE_IMAGE=registry/org/image:tag — quick-and-dirty override
-        // when developing from a terminal. Same precedence as the legacy
-        // status_view::detect_bootc_image_info path so the env var still works
-        // after the UI migrates to the service.
-        //
-        // Parsing is lenient on the tag (uses it as-is if it isn't dated) so
-        // `FINUPDATE_IMAGE=ghcr.io/ublue-os/bluefin:stable` works. parse_image_ref
-        // is stricter — it requires a date suffix because it's used to interpret
-        // bootc-status output where tags are always dated.
-        if let Ok(override_ref) = std::env::var("FINUPDATE_IMAGE") {
-            if !override_ref.is_empty() {
-                if let Some((without_tag, tag)) = override_ref.rsplit_once(':') {
-                    let parts: Vec<&str> = without_tag.splitn(3, '/').collect();
-                    if parts.len() >= 3 {
-                        let stream = strip_date_suffix(tag).unwrap_or_else(|| tag.to_string());
-                        println!(
-                            "[debug] RegistryClient::detect_with_settings() FINUPDATE_IMAGE = {}",
-                            override_ref
-                        );
-                        return Some(Self::new(parts[0], parts[1], parts[2], &stream));
-                    }
-                }
-            }
-        }
-
-        // Try bootc status --json for the most reliable answer.
-        if let Some(client) = Self::detect_from_bootc().await {
-            return Some(client);
-        }
-        // Fallback: parse os-release
-        let fallback = Self::detect_from_os_release();
-        println!(
-            "[debug] RegistryClient::detect() fallback os-release = {:?}",
-            fallback.as_ref().map(|c| c.stream.clone())
-        );
-        fallback
-    }
-
-    async fn detect_from_bootc() -> Option<Self> {
-        let cmd_name = if crate::update_worker::is_flatpak() {
-            "flatpak-spawn --host bootc status --json"
-        } else {
-            "bootc status --json"
-        };
-        println!(
-            "[debug] RegistryClient::detect_from_bootc() running {}",
-            cmd_name
-        );
-        let mut output = if crate::update_worker::is_flatpak() {
-            tokio::process::Command::new("flatpak-spawn")
-                .args(["--host", "bootc", "status", "--json"])
-                .output()
-                .await
-                .ok()?
-        } else {
-            tokio::process::Command::new("bootc")
-                .args(["status", "--json"])
-                .output()
-                .await
-                .ok()?
-        };
-
-        if !output.status.success() {
-            let pk_output = if crate::update_worker::is_flatpak() {
-                tokio::process::Command::new("flatpak-spawn")
-                    .args(["--host", "pkexec", "bootc", "status", "--json"])
-                    .output()
-                    .await
-            } else {
-                tokio::process::Command::new("pkexec")
-                    .args(["bootc", "status", "--json"])
-                    .output()
-                    .await
-            };
-            if let Ok(out) = pk_output {
-                if out.status.success() {
-                    output = out;
-                } else {
-                    return None;
-                }
-            } else {
-                return None;
-            }
-        }
-
-        let json: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
-
-        // Navigate: .status.booted.image.image.image  → full ref string
-        let image_ref = json
-            .pointer("/status/booted/image/image/image")
-            .or_else(|| json.pointer("/status/booted/image/image"))
-            .and_then(|v| v.as_str())?;
-
-        // image_ref = "ghcr.io/ublue-os/bluefin:stable-daily-43.20260222"
-        parse_image_ref(image_ref)
-    }
-
-    fn read_os_release_content() -> Option<String> {
-        if crate::update_worker::is_flatpak() {
-            let output = std::process::Command::new("flatpak-spawn")
-                .args(["--host", "cat", "/etc/os-release"])
-                .output()
-                .ok()?;
-            if output.status.success() {
-                String::from_utf8(output.stdout).ok()
-            } else {
-                None
-            }
-        } else {
-            std::fs::read_to_string("/etc/os-release").ok()
-        }
+        detection::detect_with_settings(settings).await
     }
 
     pub fn detect_from_os_release() -> Option<Self> {
-        if let Some(content) = Self::read_os_release_content() {
-            let mut image_ref = None;
-            let mut image_tag = None;
-            let mut image_id = None;
-            let mut version_id = None;
-            for line in content.lines() {
-                if let Some(v) = line.strip_prefix("IMAGE_REF=") {
-                    image_ref = Some(v.trim_matches('"').to_string());
-                } else if let Some(v) = line.strip_prefix("IMAGE_TAG=") {
-                    image_tag = Some(v.trim_matches('"').to_string());
-                } else if let Some(v) = line.strip_prefix("IMAGE_ID=") {
-                    image_id = Some(v.trim_matches('"').to_string());
-                } else if let Some(v) = line.strip_prefix("VERSION_ID=") {
-                    version_id = Some(v.trim_matches('"').to_string());
-                }
-            }
-
-            if let Some(ref_str) = image_ref {
-                let clean_ref = if let Some(pos) = ref_str.find("docker://") {
-                    &ref_str[pos + 9..]
-                } else {
-                    &ref_str
-                };
-                let parts: Vec<&str> = clean_ref.split('/').collect();
-                if parts.len() >= 3 {
-                    let registry = parts[0];
-                    let org = parts[1];
-                    let image = parts[2..].join("/");
-                    let tag = image_tag.unwrap_or_else(|| "latest".to_string());
-                    let stream = strip_date_suffix(&tag).unwrap_or(tag);
-                    return Some(Self::new(registry, org, &image, &stream));
-                }
-            }
-
-            if let (Some(img), Some(ver)) = (image_id, version_id) {
-                let org = if img.contains("dakota")
-                    || img.contains("bluefin")
-                    || img.contains("aurora")
-                {
-                    "projectbluefin"
-                } else {
-                    "ublue-os"
-                };
-                let stream = if ver == "latest" {
-                    "latest".to_string()
-                } else {
-                    format!("stable-daily-{}", ver)
-                };
-                return Some(Self::new("ghcr.io", org, &img, &stream));
-            }
-        }
-        None
+        detection::detect_from_os_release()
     }
 
     /// Fetch the most recent `max` versions for this stream, newest-first.
