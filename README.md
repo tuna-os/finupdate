@@ -61,6 +61,9 @@ The remote is an OCI index backed by `ghcr.io/tuna-os/finupdate`; see
 [tuna-os/flatpak-index](https://github.com/tuna-os/flatpak-index). Builds are
 pushed by `.github/workflows/publish-flatpak.yml` on every push to `main`.
 
+If a published build turns out to be broken, see
+[runbooks/rollback-a-bad-finupdate-release.md](runbooks/rollback-a-bad-finupdate-release.md).
+
 ## Building
 
 ### Option A: Flatpak (recommended for testing)
