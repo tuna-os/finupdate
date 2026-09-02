@@ -33,6 +33,16 @@
 //! Rust are borrowed for the duration of the call — Rust will not
 //! retain them.
 //!
+//! ## Logging
+//!
+//! There is no Rust `main()` in this configuration, so [`finupdate_new`]
+//! installs the `tracing` subscriber that `main.rs`/`cli.rs` would
+//! otherwise install. Without it every event from `finupdate-core` is
+//! dropped and a failed update check reaches the C panel as a bare `-1`.
+//! The default filter is `warn`; set `RUST_LOG=finupdate=debug` when
+//! debugging the panel. A subscriber already installed by the host process
+//! wins — we never replace one.
+//!
 //! ## Stability
 //!
 //! This surface is the contract between the Rust backend and the
@@ -69,12 +79,15 @@ pub struct Handle {
 /// `Box<Handle>` and must not be freed with `free()`.
 #[unsafe(no_mangle)]
 pub extern "C" fn finupdate_new() -> *mut Handle {
+    init_tracing();
+
     let Ok(rt) = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()
         .thread_name("finupdate-ffi")
         .build()
     else {
+        tracing::error!("finupdate_new: tokio runtime build failed, returning NULL handle");
         return ptr::null_mut();
     };
 
@@ -131,11 +144,21 @@ pub unsafe extern "C" fn finupdate_string_free(s: *mut c_char) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn finupdate_current_image_title(handle: *mut Handle) -> *mut c_char {
     let Some(handle) = (unsafe { handle.as_ref() }) else {
+        tracing::warn!("finupdate_current_image_title: NULL handle, using fallback title");
         return string_to_c("System Image");
     };
     let title = handle
         .rt
-        .block_on(async { handle.service.current_image().await.ok() })
+        .block_on(async {
+            handle
+                .service
+                .current_image()
+                .await
+                .inspect_err(|e| {
+                    tracing::warn!(error = %e, "current_image failed, using fallback title");
+                })
+                .ok()
+        })
         .map(|img| format!("{}/{}", img.org, img.image))
         .unwrap_or_else(|| "System Image".to_string());
     string_to_c(&title)
@@ -151,12 +174,22 @@ pub unsafe extern "C" fn finupdate_current_image_title(handle: *mut Handle) -> *
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn finupdate_current_image_ref(handle: *mut Handle) -> *mut c_char {
     let Some(handle) = (unsafe { handle.as_ref() }) else {
+        tracing::warn!("finupdate_current_image_ref: NULL handle");
         return ptr::null_mut();
     };
-    let Some(img) = handle
-        .rt
-        .block_on(async { handle.service.current_image().await.ok() })
-    else {
+    let Some(img) = handle.rt.block_on(async {
+        handle
+            .service
+            .current_image()
+            .await
+            .inspect_err(|e| {
+                tracing::warn!(
+                    error = %e,
+                    "current_image failed, panel will hide the image row"
+                );
+            })
+            .ok()
+    }) else {
         return ptr::null_mut();
     };
     string_to_c(&format!(
@@ -187,6 +220,7 @@ pub unsafe extern "C" fn finupdate_check_for_updates(
     user_data: *mut c_void,
 ) {
     let Some(handle) = (unsafe { handle.as_ref() }) else {
+        tracing::warn!("finupdate_check_for_updates: NULL handle, reporting error to caller");
         callback(-1, user_data);
         return;
     };
@@ -209,9 +243,18 @@ pub unsafe extern "C" fn finupdate_check_for_updates(
                         0
                     }
                 }
-                Err(_) => -1,
+                Err(e) => {
+                    tracing::error!(
+                        error = %e,
+                        "update check failed: could not list registry versions"
+                    );
+                    -1
+                }
             },
-            Err(_) => -1,
+            Err(e) => {
+                tracing::error!(error = %e, "update check failed: could not detect booted image");
+                -1
+            }
         };
         callback(result, user_data_addr as *mut c_void);
     });
@@ -511,13 +554,43 @@ fn module_to_ffi(m: crate::orchestrator::Module) -> FinupdateModule {
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
+/// Install a `tracing` subscriber for the FFI consumer.
+///
+/// `main.rs` and `cli.rs` do this for their own processes, but when this
+/// crate is loaded as `libfinupdate.so` by gnome-control-center there is no
+/// Rust `main()` — without this, every `tracing` event emitted by
+/// `finupdate-core` (privileged-action suppression, registry failures,
+/// update-worker errors) is discarded and the panel has no diagnostic trail.
+///
+/// Defaults to `warn` rather than `info` because the host process's stderr
+/// belongs to gnome-control-center, not to us; `RUST_LOG=finupdate=debug`
+/// opts into the detail. `try_init` (not `init`) so that a host which has
+/// already installed a global subscriber keeps it instead of us panicking.
+fn init_tracing() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn")),
+            )
+            .try_init();
+    });
+}
+
 fn string_to_c(s: &str) -> *mut c_char {
     // Strip interior NULs — UTF-8 strings from Rust shouldn't contain
     // them, but the panel will treat the result as a C string regardless.
     let cleaned: String = s.chars().filter(|&c| c != '\0').collect();
     match CString::new(cleaned) {
         Ok(c) => c.into_raw(),
-        Err(_) => ptr::null_mut(),
+        Err(e) => {
+            tracing::error!(
+                error = %e,
+                "string_to_c: CString conversion failed, returning NULL"
+            );
+            ptr::null_mut()
+        }
     }
 }
 
