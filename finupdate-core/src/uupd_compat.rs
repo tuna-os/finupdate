@@ -140,14 +140,28 @@ pub fn read_config() -> UupdConfig {
     };
 
     match bytes {
-        Some(b) if !b.is_empty() => match serde_json::from_slice::<UupdConfig>(&b) {
-            Ok(c) => c,
-            Err(e) => {
-                tracing::warn!("Failed to parse {}: {} — using defaults", CONFIG_PATH, e);
-                UupdConfig::default()
-            }
-        },
-        _ => UupdConfig::default(),
+        Some(b) => parse_config_or_default(&b),
+        None => UupdConfig::default(),
+    }
+}
+
+/// Parse the bytes of `/etc/uupd/config.json`, falling back to defaults.
+///
+/// Split out of [`read_config`] so the fallback policy is reachable from a
+/// test. `read_config` is pinned to an absolute host path, so on a machine
+/// without `/etc/uupd/config.json` — every CI runner — it can only ever
+/// exercise the missing-file arm. Empty and malformed content take the same
+/// route as a missing file: uupd treats all three as "use defaults".
+fn parse_config_or_default(bytes: &[u8]) -> UupdConfig {
+    if bytes.is_empty() {
+        return UupdConfig::default();
+    }
+    match serde_json::from_slice::<UupdConfig>(bytes) {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!("Failed to parse {}: {} — using defaults", CONFIG_PATH, e);
+            UupdConfig::default()
+        }
     }
 }
 
@@ -627,5 +641,69 @@ mod tests {
         // it should fall back to UupdConfig::default().
         let cfg = read_config();
         assert_eq!(cfg, UupdConfig::default());
+    }
+
+    #[test]
+    fn test_parse_config_returns_defaults_on_invalid_json() {
+        assert_eq!(
+            parse_config_or_default(b"{ invalid json }"),
+            UupdConfig::default()
+        );
+    }
+
+    #[test]
+    fn test_parse_config_returns_defaults_on_empty_input() {
+        assert_eq!(parse_config_or_default(b""), UupdConfig::default());
+    }
+
+    #[test]
+    fn test_parse_config_returns_defaults_on_wrong_field_types() {
+        // Well-formed JSON, but bat-min-percent is a string where a u32 is
+        // expected. serde fails the whole document, so defaults apply.
+        let json = br#"{"checks":{"hardware":{"bat-min-percent":"twenty"}}}"#;
+        assert_eq!(parse_config_or_default(json), UupdConfig::default());
+    }
+
+    #[test]
+    fn test_parse_config_reads_a_valid_document() {
+        let json = br#"{
+            "checks": {
+                "hardware": {
+                    "enable": false,
+                    "bat-min-percent": 35,
+                    "cpu-max-percent": 60,
+                    "mem-max-percent": 75,
+                    "net-max-bytes": 1234567
+                }
+            },
+            "modules": {
+                "brew": {"disable": true},
+                "distrobox": {"disable": false},
+                "flatpak": {"disable": true},
+                "system": {"disable": false}
+            }
+        }"#;
+        let cfg = parse_config_or_default(json);
+
+        assert!(!cfg.checks.hardware.enable);
+        assert_eq!(cfg.checks.hardware.bat_min_percent, 35);
+        assert_eq!(cfg.checks.hardware.cpu_max_percent, 60);
+        assert_eq!(cfg.checks.hardware.mem_max_percent, 75);
+        assert_eq!(cfg.checks.hardware.net_max_bytes, 1_234_567);
+        assert!(cfg.modules.brew.disable);
+        assert!(!cfg.modules.distrobox.disable);
+        assert!(cfg.modules.flatpak.disable);
+        assert!(!cfg.modules.system.disable);
+    }
+
+    #[test]
+    fn test_parse_config_fills_absent_fields_from_defaults() {
+        // Every struct carries #[serde(default)], so a partial document keeps
+        // the value it states and takes the defaults for everything else.
+        let cfg = parse_config_or_default(br#"{"modules":{"flatpak":{"disable":true}}}"#);
+
+        assert!(cfg.modules.flatpak.disable);
+        assert_eq!(cfg.checks, UupdChecks::default());
+        assert!(!cfg.modules.brew.disable);
     }
 }
