@@ -679,7 +679,7 @@ impl SimpleComponent for UpdatesPanel {
                     .developer_name("Project Bluefin")
                     .version(config::VERSION)
                     .website("https://projectbluefin.io")
-                    .issue_url("https://github.com/castrojo/finupdate/issues")
+                    .issue_url("https://github.com/tuna-os/finupdate/issues")
                     .license_type(gtk::License::MitX11)
                     .developers(vec!["Project Bluefin Contributors"])
                     .comments("A friendly system update frontend for Bluefin")
