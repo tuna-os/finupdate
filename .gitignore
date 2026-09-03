@@ -3,3 +3,8 @@
 /_flatpak
 /.flatpak-builder
 /tests/visual-audit/screenshots/
+
+# Per-developer Claude Code permissions. settings.json is the shared file;
+# settings.local.json is personal (the committed copy even carried one
+# developer's absolute home path) and should not be tracked.
+.claude/settings.local.json
