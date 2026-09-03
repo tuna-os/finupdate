@@ -1,8 +1,9 @@
 //! Finupdate library — shared modules for the GUI and CLI binaries.
 //!
-//! The service, registry, and settings modules are compiled into both binaries
-//! (finupdate GUI and finupdate-cli headless). This lib.rs re-exports them
-//! so tests can access the shared logic without depending on the full GUI/CLI stack.
+//! The service, registry, and settings modules come from the `finupdate-core`
+//! crate, which both binaries (finupdate GUI and finupdate-cli headless) depend
+//! on. This lib.rs re-exports them so tests can access the shared logic without
+//! depending on the full GUI/CLI stack.
 //!
 //! Also exposed via cdylib: see [`ffi`] for the C ABI consumed by the
 //! gnome-control-center panel under `cc-panel/`.
