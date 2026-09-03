@@ -3,12 +3,28 @@
 // portable equivalent of what users in the wheel group can already
 // authorise themselves; the rule just skips the password prompt for the
 // specific actions finupdate triggers.
+//
+// The exec allowlist matches the FULL program path, exactly. Matching a
+// substring instead (program.indexOf("bootc") >= 0) authorises every
+// executable whose path merely contains that text — /home/u/bootc/x.sh,
+// /tmp/finupdate-runner-1234.sh, anything an unprivileged process can
+// create — which turns "no password for bootc" into "no password for
+// arbitrary root code". Add a path here only if root already owns it and
+// unprivileged users cannot write to it or to any directory on the way to
+// it.
+var FINUPDATE_ALLOWED_PROGRAMS = [
+    "/usr/bin/bootc",
+    "/usr/sbin/bootc",
+    "/usr/bin/finupdate-runner",
+    "/usr/libexec/finupdate-runner"
+];
+
 polkit.addRule(function(action, subject) {
     if (subject.isInGroup("wheel")) {
         // Allow pkexec for bootc commands without password (for system updates)
         if (action.id == "org.freedesktop.policykit.exec") {
             var program = action.lookup("program");
-            if (program && (program.indexOf("bootc") >= 0 || program.indexOf("finupdate-runner") >= 0)) {
+            if (program && FINUPDATE_ALLOWED_PROGRAMS.indexOf(program) >= 0) {
                 return polkit.Result.YES;
             }
         }
