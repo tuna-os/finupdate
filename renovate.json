@@ -14,6 +14,38 @@
         "digest"
       ],
       "automerge": true
+    },
+    {
+      "description": "Each gtk-rs binding and its -sys companion must move in one update. The lockfile-only updates Renovate raises for these transitive crates bump a single entry, and a binding compiled against a stale -sys does not build: gio 0.22.9 against gio-sys 0.22.0 fails with 'cannot find type GDBusActionGroupClass in crate ffi'. Grouping them keeps the pair in one branch so the build result is real before the update lands.",
+      "matchManagers": [
+        "cargo"
+      ],
+      "matchPackageNames": [
+        "cairo-rs",
+        "cairo-sys-rs",
+        "gdk-pixbuf",
+        "gdk-pixbuf-sys",
+        "gdk4",
+        "gdk4-sys",
+        "gio",
+        "gio-sys",
+        "glib",
+        "glib-macros",
+        "glib-sys",
+        "gobject-sys",
+        "graphene-rs",
+        "graphene-sys",
+        "gtk4",
+        "gtk4-macros",
+        "gtk4-sys",
+        "libadwaita",
+        "libadwaita-sys",
+        "pango",
+        "pango-sys",
+        "pangocairo",
+        "pangocairo-sys"
+      ],
+      "groupName": "gtk-rs bindings"
     }
   ]
 }
