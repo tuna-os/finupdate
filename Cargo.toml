@@ -91,9 +91,11 @@ name = "finupdate"
 path = "src/main.rs"
 
 # Headless subcommand binary. Shares the service / registry_client / settings
-# modules with the GUI binary by file path (each binary compiles them into its
-# own crate). The CLI never links app/ui/dbus_progress/gpu — proving the
-# UpdaterService trait actually decouples the backend from the GTK frontend.
+# modules with the GUI binary through the `finupdate-core` dependency above —
+# one crate, compiled once and linked by both binaries, rather than the same
+# source files compiled separately into each. The CLI never links
+# app/ui/dbus_progress/gpu — proving the UpdaterService trait actually
+# decouples the backend from the GTK frontend.
 [[bin]]
 name = "finupdate-cli"
 path = "src/cli.rs"
