@@ -1,20 +1,10 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "local>tuna-os/.github",
+    "local>tuna-os/.github"
   ],
-  "automerge": false,
-  "platformAutomerge": true,
   "packageRules": [
-    {
-      "matchUpdateTypes": [
-        "patch",
-        "pin",
-        "pinDigest",
-        "digest"
-      ],
-      "automerge": true
-    },
     {
       "description": "Each gtk-rs binding and its -sys companion must move in one update. The lockfile-only updates Renovate raises for these transitive crates bump a single entry, and a binding compiled against a stale -sys does not build: gio 0.22.9 against gio-sys 0.22.0 fails with 'cannot find type GDBusActionGroupClass in crate ffi'. Grouping them keeps the pair in one branch so the build result is real before the update lands.",
       "matchManagers": [
