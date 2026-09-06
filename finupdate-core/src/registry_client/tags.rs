@@ -152,5 +152,5 @@ pub fn strip_date_suffix(tag: &str) -> Option<String> {
 }
 
 #[cfg(test)]
-#[path = "tags_tests.rs"]
+#[path = "test_tags.rs"]
 mod tests;
