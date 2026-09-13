@@ -10,7 +10,7 @@ use crate::ui::bootc_probe::{
     read_selected_tag,
 };
 use crate::ui::changelog::SbomStatus;
-use crate::ui::version_parse::parse_org_repo;
+use finupdate_core::version_parse::parse_org_repo;
 
 use super::helpers::{VERSION_MAX_CHARS, version_diff_box};
 use super::{StatusView, StatusViewOutput};

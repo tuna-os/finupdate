@@ -49,3 +49,4 @@ pub mod test_support;
 pub mod update_worker;
 pub mod uupd_compat;
 pub mod version_compare;
+pub mod version_parse;

@@ -11,7 +11,7 @@ use std::time::Instant;
 
 use super::bootc_probe::{get_cached_bootc_status, read_selected_tag, strip_date_suffix};
 use super::status_view::{StatusView, StatusViewInput};
-use super::version_parse::parse_org_repo;
+use finupdate_core::version_parse::parse_org_repo;
 use crate::settings::Settings;
 
 /// State of the SBOM diff fetch for the changelog page. Renders a different

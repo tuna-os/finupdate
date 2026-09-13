@@ -17,4 +17,3 @@ pub(crate) mod settings_io; // helper: auto-update settings read/write + timer t
 pub mod status_view;
 pub mod update_check_dialog;
 pub mod update_list;
-pub(crate) mod version_parse; // helper: pure image-ref parsing
