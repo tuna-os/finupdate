@@ -1,6 +1,6 @@
 # finupdate Roadmap
 
-**Last updated**: 2026-08-24 | **Maintainer**: tuna-os (hanthor)
+**Last updated**: 2026-09-16 | **Maintainer**: tuna-os (hanthor)
 
 ---
 
@@ -20,22 +20,20 @@ terminal chore.
 - **Distribution**: shipped — `flatpak install tuna-os org.tunaos.finupdate`
   live on the TunaOS Flatpak remote (indexed in flatpak-index), OCI at
   ghcr.io/tuna-os/finupdate for x86_64 + aarch64.
-- **Versioning**: **none** — zero tags, zero GitHub Releases. The publish
+- **Versioning**: **v0.1.0 release target pending** — zero tags in origin yet. The publish
   workflow fires on both `main` push and `v*` tags, so builds flow, but the
-  OCI index serves unversioned "current builds" with no tag signal.
-- **Health**: active (pushed 08-20); 4 open issues: unpinned privileged
-  publish action (#64), unmaintained Cargo.lock dep (#63), God-file spread
-  (#62).
+  OCI index requires a tagged release contract for downstream pinning.
+- **Health**: active; core tag-parsing test coverage and STE workflow adoption complete (#116, #119).
 
 ### Priorities
 
 | Priority | Item | Tracking | Status |
 |----------|------|----------|--------|
-| P0 | First tagged release — versioned OCI in the index | #65 | ⬜ Not started |
+| P0 | First tagged release (v0.1.0) — versioned OCI in the index | #65 | 🟡 In Progress |
 | P1 | Unpin `flatpak-github-actions` in publish workflow | #64 | 🟡 Open |
 | P1 | Cargo.lock: unmaintained `proc-macro-error2` | #63 | 🟡 Open |
-| P2 | God-file refactor — 5 modules ≥1,000 lines | #62 | 🟡 Open |
-| P2 | ROADMAP-coverage entry in org ROADMAP tally | #1295 | ⬜ Not started |
+| P2 | God-file refactor — module extraction | #62, #123 | 🟡 In Progress |
+| P2 | ROADMAP-coverage entry in org ROADMAP tally | #1295 | 🟡 In Progress |
 
 ---
 
@@ -47,7 +45,7 @@ terminal chore.
 
 | Goal | Owner | Tracking | Status |
 |------|-------|----------|--------|
-| Cut v0.x tag + first GitHub Release | hanthor | #65 | ⬜ Not started |
+| Cut v0.x tag + first GitHub Release | hanthor | #65 | 🟡 In Progress |
 | Unpin publish action | hanthor | #64 | ⬜ Not started |
 
 ### Next Quarter (2026 Q4)
@@ -56,9 +54,9 @@ terminal chore.
 
 | Goal | Owner | Tracking | Status |
 |------|-------|----------|--------|
-| God-file reduction (5 modules) | hanthor | #62 | ⬜ Not started |
+| God-file reduction & module boundary refactor | hanthor | #62, #123 | 🟡 In Progress |
 | Release cadence aligned with org (tagged builds in index) | tuna-os | #65 | ⬜ Not started |
 
 ---
 
-*ROADMAP added by strategist agent (ACMM L6 — full mode). Signed-off-by: hanthor-hive-agent[bot] <290068839+hanthor-hive-agent[bot]@users.noreply.github.com>*
+*ROADMAP updated by strategist agent (ACMM L6 — full mode).*
