@@ -48,3 +48,8 @@ CFG="$(mktemp -d -t finupdate-mockcfg-XXXXXX)"
 echo "PATH=$BIN:$PATH"
 echo "XDG_CONFIG_HOME=$CFG"
 echo "FINUPDATE_TEST_MOCK_RUNNER=$PWD/data/finupdate-runner"
+# CI captures under Xvfb without a GPU. Force GTK's software renderer so the
+# visual-audit contract does not depend on a host/container GLES runtime that
+# the application itself does not require. This is emitted only by the mock
+# host harness; normal Finupdate launches keep GTK's renderer selection.
+echo "GSK_RENDERER=cairo"
