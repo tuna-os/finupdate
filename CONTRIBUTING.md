@@ -28,6 +28,7 @@ sudo dnf install -y \
 ```bash
 flatpak install flathub org.flatpak.Builder
 flatpak install flathub org.gnome.Sdk//50 org.gnome.Platform//50
+flatpak install flathub org.freedesktop.Sdk.Extension.rust-stable//25.08
 ```
 
 ### Quick Build & Test Cycle
