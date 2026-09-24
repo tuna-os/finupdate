@@ -36,6 +36,14 @@ polkit.addRule(function(action, subject) {
         if (action.id == "org.freedesktop.login1.reboot") {
             return polkit.Result.YES;
         }
+        // Systemd unit management
+        if (action.id == "org.freedesktop.systemd1.manage-units") {
+            return polkit.Result.YES;
+        }
+        // Systemd unit file management
+        if (action.id == "org.freedesktop.systemd1.manage-unit-files") {
+            return polkit.Result.YES;
+        }
     }
 });
 ```
