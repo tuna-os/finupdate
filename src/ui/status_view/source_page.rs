@@ -5,7 +5,7 @@ use relm4::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::ui::bootc_probe::read_bootc_image_info_config;
+use crate::bootc_probe::read_bootc_image_info_config;
 
 use super::{StatusView, StatusViewInput};
 

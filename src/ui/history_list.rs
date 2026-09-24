@@ -6,31 +6,19 @@
 //! list with pin / rollback / set-default interactions. They only need the
 //! component's message enum and sender, so the widget-building code now
 //! lives outside the view file.
+//!
+//! `MockDeployment` itself moved to `finupdate_core::bootc_probe` alongside
+//! the probe logic that builds it from real `bootc status` JSON
+//! (finupdate#111) — re-exported here so the widget-side call sites
+//! (`status_view/mod.rs`, `status_view/dialogs.rs`) keep resolving
+//! `crate::ui::history_list::MockDeployment` unchanged.
 
 use gtk::prelude::*;
 use relm4::prelude::*;
 
-use super::bootc_probe::get_real_deployments;
 use super::status_view::{StatusView, StatusViewInput};
-
-/// Mock deployment representation for the collapsible version history list.
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct MockDeployment {
-    pub id: String,
-    pub state: String, // "current" | "staged" | "previous" | "archived"
-    pub title: String,
-    pub image: String,
-    pub tag: String,
-    pub digest: String,
-    pub deployed: String,
-    pub deployed_full: String,
-    pub size: String,
-    pub kernel: String,
-    pub package_count: u32,
-    pub signer: String,
-    pub pinned: bool,
-}
+use crate::bootc_probe::get_real_deployments;
+pub use crate::bootc_probe::MockDeployment;
 
 pub fn get_sample_deployments(_reboot_pending: bool) -> Vec<MockDeployment> {
     // Always try real data first; return empty if unavailable rather than
