@@ -13,8 +13,8 @@
 // references keep resolving — the split is about enforcing the boundary, not
 // about churning every call site.
 pub use finupdate_core::{
-    action_journal, config, gpu, orchestrator, privileged, registry_client, runtime, sbom_diff,
-    service, settings, update_worker, uupd_compat,
+    action_journal, bootc_probe, config, gpu, orchestrator, privileged, registry_client, runtime,
+    sbom_diff, service, settings, update_worker, uupd_compat,
 };
 
 pub mod app;

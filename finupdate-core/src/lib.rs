@@ -18,6 +18,7 @@
 //! |---|---|
 //! | [`service`] | The `UpdaterService` trait and its bootc-backed impl |
 //! | [`registry_client`] | GHCR queries, image-ref parsing, family resolution |
+//! | [`bootc_probe`] | Host bootc/os-release introspection and its pure parsers |
 //! | [`sbom_diff`] | SPDX fetch and package diffing |
 //! | [`orchestrator`] | Runs `finupdate-runner` and parses its marker protocol |
 //! | [`update_worker`] | Update event stream, including the simulator |
@@ -35,6 +36,7 @@
 //! Shell extension and is meaningful only to a running frontend.
 
 pub mod action_journal;
+pub mod bootc_probe;
 pub mod config;
 pub mod gpu;
 pub mod orchestrator;
