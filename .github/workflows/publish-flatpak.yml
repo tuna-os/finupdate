@@ -3,11 +3,20 @@ name: Publish Flatpak
 # Build/publish body lives in tuna-os/.github's reusable publish-flatpak.yml
 # (tunaos#1183 recommendation #2). This file just keeps finupdate's own
 # trigger policy.
+#
+# Push-to-main publishes are gated on CI: instead of triggering on `push`
+# directly (which raced CI.yml and could ship a build that failed
+# cargo test/clippy/fmt, see #103), this waits for the "CI" workflow to
+# finish on main and only proceeds if it passed. Tag pushes and manual
+# dispatch are deliberate, human-triggered releases and bypass this gate.
 
 on:
   push:
-    branches: [main]
     tags: ['v*']
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -16,6 +25,10 @@ permissions:
 
 jobs:
   publish:
+    if: >
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
     uses: tuna-os/.github/.github/workflows/publish-flatpak.yml@main
     with:
       app-id: org.tunaos.finupdate
