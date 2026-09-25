@@ -846,23 +846,23 @@ dependencies = [
 
 [[package]]
 name = "glib-sys"
-version = "0.22.6"
+version = "0.22.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f7fbac234ed5bc2a28359b7bde8e1b9cdf1441cc2d7f068e4824672d7db9445"
+checksum = "99b38907e67e40dec9b60f858bcada952598719cb512a13eb13d6cdcd16f8295"
 dependencies = [
  "libc",
- "system-deps 7.0.8",
+ "system-deps 9.0.0",
 ]
 
 [[package]]
 name = "gobject-sys"
-version = "0.22.6"
+version = "0.22.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22a861859b887a79cf461359c192c97a57d8fb0229dd291232e57aa11f6fa72c"
+checksum = "07595c9ba696bd9819cb6a8df39f08078f3dd679508fe052dd558492c2053834"
 dependencies = [
  "glib-sys",
  "libc",
- "system-deps 7.0.8",
+ "system-deps 9.0.0",
 ]
 
 [[package]]
@@ -1564,14 +1564,14 @@ dependencies = [
 
 [[package]]
 name = "pango-sys"
-version = "0.22.0"
+version = "0.22.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbd111a20ca90fedf03e09c59783c679c00900f1d8491cca5399f5e33609d5d6"
+checksum = "ca02d64761b74d56cdd4b437db6d73dc95e6c0d40f27e1c707952c0f09052948"
 dependencies = [
  "glib-sys",
  "gobject-sys",
  "libc",
- "system-deps 7.0.8",
+ "system-deps 9.0.0",
 ]
 
 [[package]]
@@ -1588,15 +1588,15 @@ dependencies = [
 
 [[package]]
 name = "pangocairo-sys"
-version = "0.22.0"
+version = "0.22.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d95cb73468373b9e568abb1afbaf5b42fe6ab9128fc41b5f2adbf69451c3c77f"
+checksum = "a649a616d67ae68539bc85f00fb45d36fba742ed20fc20e6712a15d8ee52bd3f"
 dependencies = [
  "cairo-sys-rs",
  "glib-sys",
  "libc",
  "pango-sys",
- "system-deps 7.0.8",
+ "system-deps 9.0.0",
 ]
 
 [[package]]
