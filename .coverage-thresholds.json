@@ -1,0 +1,8 @@
+{
+  "version": "1",
+  "overall": {
+    "target": 50,
+    "enforced": true
+  },
+  "notes": "Starting gate set to 50% coverage. Raise this threshold over time as test coverage improves. Use with cargo tarpaulin or llvm-cov for measurement."
+}
