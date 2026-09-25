@@ -154,7 +154,7 @@ prompt OR a public-network round-trip.
 |----------------------------------------------------|---------------------------------|-------------------------------------|-----------|-----------|
 | `bootc upgrade --check`                            | on launch (preflight)           | `src/app.rs` preflight closure      | direct (no pkexec) | (would need fake binary on PATH) |
 | `bootc status --json`                              | rebase dialog open + registry detect | `src/registry_client.rs`        | **root**  | tuna-os/finupdate#9 |
-| `flatpak-spawn --host pkexec /app/bin/finupdate-runner` | StartUpdate (non-dev)      | `src/orchestrator.rs::run`          | pkexec    | mock runner in tests (**add**) |
+| `flatpak-spawn --host pkexec /usr/bin/sh -c <runner body>` | StartUpdate (non-dev)   | `src/orchestrator.rs::run`          | pkexec    | mock runner in tests (**add**) |
 | `pkexec systemctl reboot`                          | ConfirmReboot (non-dev)         | `src/app.rs` reboot handler         | pkexec    | journal action `reboot` |
 | `pkexec shutdown -r 02:00`                         | "Restart Tonight" on the hero row | `status_view.rs::schedule_reboot_tonight` | pkexec | journal action `schedule_reboot` |
 | `pkexec bootc switch <ref>`                        | Rebase dialog "Switch"/"Pin"    | `rebase_dialog.rs::run_bootc_switch` | pkexec   | journal action `switch_image`, args.target |
