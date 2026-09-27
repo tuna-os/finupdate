@@ -13,6 +13,23 @@ set -u
 
 emit() { printf '===%s===\n' "$1"; }
 
+# Tracks whether any module exited non-zero and non-77 (77 = "nothing to
+# update", not a failure). The script's own exit code reflects this at the
+# end so a caller that only checks the process exit status (rather than
+# parsing the marker stream) still sees a failed run as a failure.
+RUNNER_HAD_FAILURE=0
+
+# Emits a module's done marker and records the exit code toward
+# RUNNER_HAD_FAILURE. $1 = module name, $2 = module exit code.
+emit_done() {
+    module="$1"
+    code="$2"
+    emit "MODULE:${module}:done:${code}"
+    if [ "$code" != "0" ] && [ "$code" != "77" ]; then
+        RUNNER_HAD_FAILURE=1
+    fi
+}
+
 # When FINUPDATE_SYSTEM_ONLY=1 (set by the "Include app updates" toggle in
 # Preferences), skip flatpak / brew / distrobox and only refresh the system
 # image. The marker stream still emits the per-module headers as `skipped`
@@ -23,10 +40,10 @@ SYSTEM_ONLY="${FINUPDATE_SYSTEM_ONLY:-0}"
 emit MODULE:system
 if command -v bootc >/dev/null 2>&1; then
     bootc upgrade
-    emit "MODULE:system:done:$?"
+    emit_done system "$?"
 elif command -v rpm-ostree >/dev/null 2>&1; then
     rpm-ostree upgrade
-    emit "MODULE:system:done:$?"
+    emit_done system "$?"
 else
     echo "system: neither bootc nor rpm-ostree found — skipping"
     emit MODULE:system:skipped
@@ -39,7 +56,7 @@ if [ "$SYSTEM_ONLY" = "1" ]; then
     emit MODULE:flatpak:skipped
 elif command -v flatpak >/dev/null 2>&1; then
     flatpak update -y --noninteractive
-    emit "MODULE:flatpak:done:$?"
+    emit_done flatpak "$?"
 else
     echo "flatpak: not found — skipping"
     emit MODULE:flatpak:skipped
@@ -79,7 +96,7 @@ else
         fi
         if [ -n "$BREW_USER" ]; then
             su - "$BREW_USER" -c "$BREW_BIN upgrade --quiet"
-            emit "MODULE:brew:done:$?"
+            emit_done brew "$?"
         else
             echo "brew: could not determine non-root user — skipping"
             emit MODULE:brew:skipped
@@ -97,10 +114,18 @@ if [ "$SYSTEM_ONLY" = "1" ]; then
     emit MODULE:distrobox:skipped
 elif command -v distrobox >/dev/null 2>&1; then
     distrobox upgrade --all
-    emit "MODULE:distrobox:done:$?"
+    emit_done distrobox "$?"
 else
     echo "distrobox: not found — skipping"
     emit MODULE:distrobox:skipped
 fi
 
 emit DONE
+
+# Aggregate exit code: any module failure makes the whole run fail, even
+# though each module already reports its own outcome through the marker
+# stream. A caller relying only on this process's exit status (rather than
+# parsing markers) must not observe success when a module failed.
+if [ "$RUNNER_HAD_FAILURE" = "1" ]; then
+    exit 1
+fi

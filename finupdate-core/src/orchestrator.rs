@@ -22,6 +22,13 @@
 //! ```
 //!
 //! All other lines are forwarded as `UpdateEvent::Output`.
+//!
+//! The runner script's own process exit code is not trusted as the sole
+//! signal of success: it always exits 0 once it reaches `===DONE===`, even
+//! if an individual module failed along the way. `run()` tracks the first
+//! `ModuleFinished(_, Failed(_))` seen in the marker stream and emits
+//! `UpdateEvent::Error` for it instead of `Complete`/`UpToDate`, regardless
+//! of the process exit status.
 
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
@@ -131,13 +138,28 @@ pub async fn run(
         });
 
         // Stream stdout, parsing marker lines into structured events.
+        //
+        // `finupdate-runner`'s own process exit code cannot be trusted to
+        // reflect module failure — the script never aggregates per-module
+        // exit codes into its own `exit`, so it always exits 0 as long as it
+        // reaches the end. Track the marker stream directly instead: the
+        // first `ModuleFinished(_, Failed(_))` we see is recorded here and
+        // consulted below, alongside the process exit status, when deciding
+        // the terminal event.
+        let mut first_failed_module: Option<(Module, i32)> = None;
         let tx_out = tx.clone();
         let stdout_future = async move {
             if let Some(stdout) = stdout {
                 let mut lines = BufReader::new(stdout).lines();
                 while let Ok(Some(line)) = lines.next_line().await {
                     let send_result = match parse_line(&line) {
-                        ParsedLine::Event(ev) => tx_out.send(ev),
+                        ParsedLine::Event(ev) => {
+                            if let UpdateEvent::ModuleFinished(m, ModuleStatus::Failed(code)) = ev
+                            {
+                                first_failed_module.get_or_insert((m, code));
+                            }
+                            tx_out.send(ev)
+                        }
                         ParsedLine::Consumed => continue,
                         ParsedLine::Plain => tx_out.send(UpdateEvent::Output(line)),
                     };
@@ -146,11 +168,13 @@ pub async fn run(
                     }
                 }
             }
+            first_failed_module
         };
 
-        let cancelled = tokio::select! {
-            _ = stdout_future => false,
-            _ = cancel_rx => true,
+        let cancelled;
+        let first_failed_module = tokio::select! {
+            failed = stdout_future => { cancelled = false; failed }
+            _ = cancel_rx => { cancelled = true; None }
         };
 
         if let Some(task) = stderr_task {
@@ -166,11 +190,22 @@ pub async fn run(
         }
 
         match child.wait().await {
-            Ok(status) if status.success() => {
-                let _ = tx.send(UpdateEvent::Complete);
-            }
-            Ok(status) if status.code() == Some(77) => {
-                let _ = tx.send(UpdateEvent::UpToDate);
+            Ok(status) if status.success() || status.code() == Some(77) => {
+                // The process exit code alone says "clean run", but the
+                // marker stream is the ground truth for per-module outcomes
+                // — a module can fail mid-run without the runner script's
+                // own exit code reflecting it (see finupdate#161). Prefer
+                // that signal over a bare `status.success()`.
+                if let Some((module, code)) = first_failed_module {
+                    let _ = tx.send(UpdateEvent::Error(format!(
+                        "{} module failed (exit {code})",
+                        module.key()
+                    )));
+                } else if status.code() == Some(77) {
+                    let _ = tx.send(UpdateEvent::UpToDate);
+                } else {
+                    let _ = tx.send(UpdateEvent::Complete);
+                }
             }
             Ok(status) => {
                 let code = status.code().unwrap_or(-1);
@@ -507,6 +542,90 @@ mod tests {
         assert!(has_output, "Missing System output line 1");
         assert!(has_finished, "Missing ModuleFinished(System, Success)");
         assert!(has_complete, "Missing Complete");
+    }
+
+    #[tokio::test]
+    async fn test_orchestrator_module_failure_overrides_zero_exit() {
+        // Regression for finupdate#161: finupdate-runner's own exit code
+        // always used to be 0 once it reached ===DONE===, even if a module
+        // failed along the way. A mock runner reproducing exactly that shape
+        // — brew fails, but the script still exits 0 — must not resolve to
+        // UpdateEvent::Complete.
+        let _lock = env_lock().lock().await;
+        use std::io::Write;
+        let mut mock_script = tempfile::NamedTempFile::new().unwrap();
+        writeln!(
+            mock_script,
+            "#!/bin/sh\n\
+             echo '===MODULE:system==='\n\
+             echo '===MODULE:system:done:0==='\n\
+             echo '===MODULE:flatpak==='\n\
+             echo '===MODULE:flatpak:done:0==='\n\
+             echo '===MODULE:brew==='\n\
+             echo '===MODULE:brew:done:1==='\n\
+             echo '===MODULE:distrobox==='\n\
+             echo '===MODULE:distrobox:done:0==='\n\
+             echo '===DONE==='\n\
+             exit 0"
+        )
+        .unwrap();
+
+        let temp_path = mock_script.into_temp_path();
+        let path = temp_path.to_path_buf();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        unsafe {
+            std::env::set_var("FINUPDATE_TEST_MOCK_RUNNER", &path);
+        }
+
+        let (_cancel_tx, cancel_rx) = tokio::sync::oneshot::channel();
+        let mut rx = run(cancel_rx).await;
+
+        let mut events = vec![];
+        while let Some(ev) = rx.recv().await {
+            events.push(ev);
+        }
+
+        unsafe {
+            std::env::remove_var("FINUPDATE_TEST_MOCK_RUNNER");
+        }
+
+        let mut has_module_failed = false;
+        let mut has_complete = false;
+        let mut has_error = false;
+        let mut error_msg = String::new();
+
+        for ev in events {
+            match ev {
+                UpdateEvent::ModuleFinished(Module::Brew, ModuleStatus::Failed(1)) => {
+                    has_module_failed = true
+                }
+                UpdateEvent::Complete => has_complete = true,
+                UpdateEvent::Error(msg) => {
+                    has_error = true;
+                    error_msg = msg;
+                }
+                _ => {}
+            }
+        }
+
+        assert!(
+            has_module_failed,
+            "Missing ModuleFinished(Brew, Failed(1))"
+        );
+        assert!(
+            !has_complete,
+            "Process exited 0 but a module failed — must not emit Complete"
+        );
+        assert!(has_error, "Expected a terminal Error event");
+        assert!(
+            error_msg.contains("brew"),
+            "Error message should name the failed module, got: {error_msg}"
+        );
     }
 
     #[tokio::test]
