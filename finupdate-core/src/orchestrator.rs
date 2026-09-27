@@ -6,7 +6,10 @@
 
 //! Pure-Rust update orchestrator — replaces the host `uupd` binary.
 //!
-//! Invokes `finupdate-runner` (a small shell script bundled in `/app/bin/`)
+//! Invokes `finupdate-runner` (a small shell script; bundled at
+//! `/app/bin/` for native execution, and expected at a fixed host path --
+//! `/usr/bin/` or `/usr/libexec/` -- when running from inside a Flatpak,
+//! since the host's `pkexec` cannot see anything under the sandbox's `/app/`)
 //! via a single `pkexec` elevation, then parses structured marker lines from
 //! its stdout to emit `ModuleStarted` / `ModuleFinished` events alongside the
 //! raw output lines.
@@ -189,15 +192,34 @@ pub async fn run(
     rx
 }
 
+/// Renders the host-side shell driver Flatpak mode hands to `flatpak-spawn
+/// --host sh -c`. Tries the two polkit-allowlisted `finupdate-runner`
+/// locations in order and `exec pkexec`s the first one that exists and is
+/// executable; never touches `/tmp` or any other mutable, unauthorized path.
+/// Split out so the exact-path selection can be tested without spawning
+/// `flatpak-spawn`/`pkexec` (tuna-os/finupdate#124).
+fn flatpak_runner_driver(env_prefix: &str) -> String {
+    format!(
+        r#"
+for p in /usr/bin/finupdate-runner /usr/libexec/finupdate-runner; do
+  if [ -x "$p" ]; then
+    exec pkexec {env_prefix}"$p"
+  fi
+done
+echo "finupdate: no host-installed finupdate-runner at /usr/bin or /usr/libexec -- install the finupdate native package (see INSTALL.md)" >&2
+exit 127
+"#
+    )
+}
+
 /// Build the command that invokes `finupdate-runner` with a single pkexec.
 ///
-/// Inside a Flatpak the bundled runner lives at `/app/bin/finupdate-runner`,
-/// but that's a sandbox-internal path — `flatpak-spawn --host pkexec
-/// /app/bin/finupdate-runner` was failing with exit 127 because the host's
-/// pkexec doesn't see anything under `/app/`. Fix: stage the script body to
-/// a host-visible temp file, then invoke that path with pkexec. The temp
-/// file is named with a `finupdate-runner-` prefix so the polkit rules
-/// (`/etc/polkit-1/rules.d/49-finupdate.rules`) match it by name.
+/// Native builds run the copy meson installed on `PATH`. Flatpak mode runs
+/// the copy the host packaging installed at a fixed, polkit-allowlisted
+/// path (`/usr/bin/finupdate-runner` or `/usr/libexec/finupdate-runner`) --
+/// never the sandbox's own bundled copy under `/app/bin/`, which the host's
+/// pkexec cannot see and which motivated an earlier, less safe workaround
+/// (see the comment inside the `is_flatpak()` branch).
 fn build_runner_command(system_only: bool) -> Command {
     if let Ok(mock_path) = std::env::var("FINUPDATE_TEST_MOCK_RUNNER") {
         let mut cmd = Command::new(mock_path);
@@ -223,31 +245,34 @@ fn build_runner_command(system_only: bool) -> Command {
     };
 
     if is_flatpak() {
-        let script_body = std::fs::read_to_string("/app/bin/finupdate-runner")
-            .unwrap_or_else(|_| {
-                "#!/bin/sh\necho 'finupdate-runner script not bundled in this flatpak' >&2\necho '===DONE==='\nexit 127\n".to_string()
-            });
-
-        // The double-`-c` wrapper: outer sh writes the script body (received
-        // on stdin) to a host /tmp file under a polkit-friendly name, then
-        // pkexec's the result. Trailing `rm` keeps /tmp tidy. Pipe the script
-        // body via env var so we don't need stdin plumbing.
-        let driver = format!(
-            r#"
-set -e
-TMPFILE=$(mktemp /tmp/finupdate-runner-XXXXXX.sh)
-trap 'rm -f "$TMPFILE"' EXIT
-printf '%s' "$FINUPDATE_RUNNER_BODY" > "$TMPFILE"
-chmod +x "$TMPFILE"
-pkexec {env_prefix}"$TMPFILE"
-"#
-        );
+        // `flatpak-spawn --host pkexec /app/bin/finupdate-runner` fails with
+        // exit 127: `/app/` is a sandbox-internal path invisible to the
+        // host's pkexec. A prior fix worked around that by staging the
+        // bundled script body to a fresh /tmp file and pkexec-ing *that* --
+        // but the shipped polkit rule authorizes only the exact paths
+        // `/usr/bin/finupdate-runner` and `/usr/libexec/finupdate-runner`
+        // (build-aux/49-finupdate.polkit.rules), so a generated /tmp path
+        // falls outside the allowlist, and the file stays owned and
+        // writable by the unprivileged caller between creation and
+        // pkexec's exec -- a TOCTOU window an unprivileged process sharing
+        // that user session could race (tuna-os/finupdate#124).
+        //
+        // Fix: invoke one of the two allowlisted host-owned paths directly,
+        // matching the native (non-Flatpak) branch below, which already
+        // relies on a host-installed `finupdate-runner`. The meson install
+        // (data/meson.build) puts it in `bindir`, i.e. `/usr/bin` on a
+        // standard prefix; `/usr/libexec` is kept as an allowlisted
+        // fallback for a libexec-convention packaging. The wrapping shell
+        // only *selects* which fixed path to hand to pkexec -- it never
+        // constructs or runs anything itself as root, and polkit's exact-
+        // path check applies to whichever literal path `exec pkexec` is
+        // called with, so the authorized surface is still exactly the two
+        // allowlisted paths.
         let mut cmd = Command::new("flatpak-spawn");
-        cmd.arg("--host")
-            .arg(format!("--env=FINUPDATE_RUNNER_BODY={}", script_body))
-            .arg("sh")
+        cmd.arg("--host");
+        cmd.arg("sh")
             .arg("-c")
-            .arg(driver);
+            .arg(flatpak_runner_driver(env_prefix));
         cmd
     } else {
         // Native build / dev: PATH lookup. `cargo install --path .` or the
@@ -341,6 +366,93 @@ mod tests {
         assert_eq!(Module::from_key("nothing"), None);
         assert_eq!(Module::from_key(""), None);
         assert_eq!(Module::from_key("SYSTEM"), None);
+    }
+
+    #[test]
+    fn flatpak_driver_never_mentions_tmp() {
+        // Regression for tuna-os/finupdate#124: the driver must only ever
+        // name the two polkit-allowlisted host paths, never stage anything
+        // under /tmp (which is outside the exact-path allowlist and would
+        // be writable by the caller between creation and pkexec's exec).
+        let driver = flatpak_runner_driver("");
+        assert!(
+            !driver.contains("/tmp"),
+            "driver must not reference /tmp: {driver}"
+        );
+        assert!(
+            !driver.contains("mktemp"),
+            "driver must not create a temp file: {driver}"
+        );
+        assert!(driver.contains("/usr/bin/finupdate-runner"));
+        assert!(driver.contains("/usr/libexec/finupdate-runner"));
+        // Exactly the fixed path is handed to pkexec, not a variable script
+        // body -- "$p" is one of the two loop-bound literals above, never
+        // caller-controlled content.
+        assert!(driver.contains(r#"exec pkexec "$p""#));
+    }
+
+    #[test]
+    fn flatpak_driver_carries_system_only_env_prefix() {
+        let driver = flatpak_runner_driver("env FINUPDATE_SYSTEM_ONLY=1 ");
+        assert!(driver.contains(r#"exec pkexec env FINUPDATE_SYSTEM_ONLY=1 "$p""#));
+    }
+
+    #[tokio::test]
+    async fn flatpak_driver_execs_first_existing_path() {
+        // End-to-end proof the shell driver actually selects and execs a
+        // real allowlisted-shaped path rather than falling back to /tmp:
+        // run it under `sh -c` with PATH-mocked `pkexec`, honoring only the
+        // second of the two candidate paths existing (as if only the
+        // libexec-convention package were installed).
+        let _lock = env_lock().lock().await;
+        let env = MockEnv::new();
+        let pkexec = env.create_mock_bin("pkexec", 0);
+
+        let runner_dir = tempfile::tempdir().unwrap();
+        let runner_path = runner_dir.path().join("finupdate-runner");
+        std::fs::write(&runner_path, "#!/bin/sh\nexit 0\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&runner_path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        // Substitute the driver's fixed candidates with our tempdir path so
+        // the test never needs real root-owned /usr paths.
+        let driver = flatpak_runner_driver("")
+            .replace("/usr/bin/finupdate-runner", "/nonexistent/finupdate-runner")
+            .replace(
+                "/usr/libexec/finupdate-runner",
+                runner_path.to_str().unwrap(),
+            );
+
+        let original_path = std::env::var("PATH").unwrap_or_default();
+        let new_path = format!("{}:{}", env.bin_dir.display(), original_path);
+        unsafe {
+            std::env::set_var("PATH", &new_path);
+        }
+
+        let output = tokio::process::Command::new("sh")
+            .arg("-c")
+            .arg(&driver)
+            .output()
+            .await
+            .unwrap();
+
+        unsafe {
+            std::env::set_var("PATH", &original_path);
+        }
+
+        assert!(output.status.success(), "driver did not exit 0: {output:?}");
+        let invocations = env.read_invocations();
+        assert!(
+            invocations.contains(&format!(
+                "pkexec called with args: {}",
+                runner_path.display()
+            )),
+            "pkexec was not invoked with the existing candidate path: {invocations}"
+        );
+        let _ = pkexec;
     }
 
     #[test]
