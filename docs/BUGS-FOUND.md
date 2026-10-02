@@ -1,20 +1,20 @@
 # Bugs found while standing up the screenshot/validation harness
 
-All found by actually running the app under Broadway on the build host and reading
-what it did, rather than by inspection. Ordered by user impact.
+We found all of these when we ran the app under Broadway on the build host and
+read what it did, not by inspection. The list order is by user impact.
 
 ---
 
 ## 1. Every GUI update was silently simulated ✅ fixed
 
 **Symptom:** the app ran in Developer Mode permanently, so no update, rebase, or
-reboot the GUI performed ever touched the system.
+reboot from the GUI ever touched the system.
 
-**Cause:** two compounding defects.
+**Cause:** two defects that made each other worse.
 
-* `main.rs` applied `--dev-mode` by mutating `settings.json` and calling
-  `save()`. Running `finupdate --dev-mode` **once** left developer mode on
-  forever. The build host's `~/.config/finupdate/settings.json` was found with
+* `main.rs` applied `--dev-mode` when it changed `settings.json` and called
+  `save()`. One run of `finupdate --dev-mode` left developer mode on
+  forever. The build host's `~/.config/finupdate/settings.json` had
   `"dev_mode": true` written into it.
 * `Settings::default()` set `dev_mode: is_dev_build`, and `is_dev_build` is true
   whenever `config::PROFILE` is empty — which is the case for *any* plain
@@ -23,38 +23,38 @@ reboot the GUI performed ever touched the system.
 
 **Fix:**
 * CLI flags now layer through `settings::RuntimeOverrides`, held in memory and
-  never written back (`settings.rs`). Invoking the app with a test flag can no
+  never written back (`settings.rs`). A test flag on the app command line can no
   longer change stored configuration.
 * The dev-build default is now `dry_run: true`, not `dev_mode: true`. Real code
   paths run; the `privileged()` chokepoint withholds the destructive command at
   the point of execution.
-* Added `--no-dev-mode` so an already-polluted `settings.json` can be escaped.
+* Added `--no-dev-mode` so that you can escape from an already-polluted `settings.json`.
 
 **Note for you:** your real config on the build host still has `dev_mode: true`. The
-test harness now uses an isolated `XDG_CONFIG_HOME`, so it is untouched — but
-your interactive runs will keep simulating until that value is cleared.
+test harness now uses an isolated `XDG_CONFIG_HOME`, so the harness does not touch it. But
+your interactive runs will continue to simulate until you clear that value.
 
 ---
 
 ## 2. Startup storm: 1213 changelog fetches and 1216 SBOM diffs per launch ✅ fixed
 
 **Symptom:** the window frequently never painted at all. The process sat at
-100% CPU with ~1261 threads, and GHCR/GitHub calls timed out — which then made
-every *subsequent* run worse, because the API rate limits were exhausted.
+100% CPU with ~1261 threads, and GHCR/GitHub calls timed out. This then made
+every *subsequent* run worse, because the runs used all of the API rate limits.
 
 **Cause:** `AvailableTagsLoaded` repopulated the tag `StringList` with
 `remove(0)` in a loop followed by `append` per item. Each mutation moves the
 combo row's selection, firing `connect_selected_notify` — roughly 2N times for
-N tags. Every one of those carried a *different* raw tag, so the existing
-idempotency guard in `SelectTag` (which only compares against the current tag)
-let all of them through, and each spawned a full changelog fetch + SBOM diff.
+N tags. Every one of those carried a *different* raw tag. The existing
+idempotency guard in `SelectTag` only compares against the current tag, so it
+let all of them through. Each one spawned a full changelog fetch + SBOM diff.
 
 `ghcr.io/ublue-os/bluefin` publishes 612 tags, giving ~1213 fetches on a single
 launch.
 
 **Fix** (`status_view.rs`): block the `selected_notify` handler across the
 repopulation, replace the remove/append loop with a single `splice()`, then
-restore the selection and unblock. Handler id is stored as `tag_row_handler`.
+restore the selection and unblock. The code stores the handler id as `tag_row_handler`.
 
 **Measured, same launch, before → after:**
 
@@ -70,17 +70,17 @@ restore the selection and unblock. Handler id is stored as `tag_row_handler`.
 
 ## 3. Ten ad-hoc tokio runtimes → thread exhaustion ✅ fixed
 
-**Symptom:** `OS can't spawn worker thread: Resource temporarily unavailable`,
-surfacing as a panic deep inside hyper's DNS resolver — far from the cause.
+**Symptom:** `OS can't spawn worker thread: Resource temporarily unavailable`.
+It showed as a panic deep inside hyper's DNS resolver — far from the cause.
 
-**Cause:** the GLib↔tokio bridge was open-coded at ten-plus call sites
+**Cause:** ten-plus call sites had their own open-coded GLib↔tokio bridge
 (`app.rs` ×3, `rebase_dialog.rs` ×3, `status_view.rs` ×3, `rebase_widget.rs`,
-`changelog_widget.rs`), each building a *fresh* runtime with its own worker and
-blocking pools. Some sat in per-row rendering code, so the counts multiplied.
+`changelog_widget.rs`). Each one built a *fresh* runtime with its own pools of
+worker and blocker threads. Some sat in the render code for each row, so the counts multiplied.
 
-**Fix:** new `src/runtime.rs` — one shared multi-threaded runtime with bounded
-pools (4 workers, 32 blocking threads), and a `block_on` that picks the right
-strategy for the calling context. Ad-hoc runtimes removed.
+**Fix:** new `src/runtime.rs` — one shared runtime with many threads and bounded
+pools (4 workers, 32 blocker threads). It also has a `block_on` that picks the right
+strategy for the context of the caller. Ad-hoc runtimes removed.
 
 `ffi.rs` was already correct (one runtime per `Handle`) and was left alone.
 
@@ -98,7 +98,7 @@ where `block_on` panics.
 
 **Fix:** route through `runtime::block_on`, which uses `block_in_place` when
 already inside the runtime. Also memoised the whole function
-(`BOOTC_IMAGE_INFO_CACHE`) — it was re-running the full detection chain,
+(`BOOTC_IMAGE_INFO_CACHE`) — it ran the full detection chain again,
 including a `bootc status` subprocess, once per rendered version row.
 
 ---
@@ -108,34 +108,34 @@ including a `bootc status` subprocess, once per rendered version row.
 **Symptom:** `finupdate --dry-run` exited with `Unknown option --dry-run`
 *after* logging that it had accepted the flag.
 
-**Cause:** flags were parsed by hand, then the full `argv` was handed to
-`RelmApp`, and GApplication parses argv itself and aborts on anything it does
+**Cause:** the code parsed flags by hand, then gave the full `argv` to
+`RelmApp`. GApplication also parses argv, and it aborts on anything it does
 not recognise.
 
-**Fix:** pass only `argv[0]` to `RelmApp::with_args` — every flag has already
-been consumed into `RuntimeOverrides` by that point.
+**Fix:** pass only `argv[0]` to `RelmApp::with_args` — at that point, `RuntimeOverrides` already
+holds every flag.
 
 ---
 
 ## 6. Window cannot reach the HIG minimum width ✅ fixed
 
-Lowering `width-request` to 360 and adding an `AdwBreakpoint` was not enough —
-the window still refused to narrow. Rather than guess, `FINUPDATE_MEASURE=1`
-was added to walk the widget tree at startup and print each widget's measured
+We lowered `width-request` to 360 and added an `AdwBreakpoint`, but this was not enough —
+the window still refused to narrow. So, to replace guesswork, we added `FINUPDATE_MEASURE=1`.
+It walks the widget tree at startup and prints each widget's measured
 minimum width (`FINUPDATE_MEASURE_MIN` filters to the offenders).
 
-That showed the window itself honouring 360 while its content demanded 579, and
-the chain bottoming out at preference *rows* of 543–549px. But the rows on the
-visible page were not that wide: **`gtk::Stack` is homogeneous by default**, so
+That showed that the window itself honoured 360 while its content demanded 579.
+At the bottom of the chain were preference *rows* of 543–549px. But the rows on the
+visible page were not that wide. **`gtk::Stack` is homogeneous by default**, so
 it requests the largest width of *every* page, including hidden ones. The idle
-page was inheriting the minimum width of the history/changelog rows it had never
+page got the minimum width of the history/changelog rows it had never
 displayed.
 
-Fixed by turning off `hhomogeneous`/`vhomogeneous` on the status stack, so it
-sizes to the visible child — which is what an adaptive layout wants anyway — and
-letting the row labels wrap (`title-lines`/`subtitle-lines` of **0**, meaning
-*unlimited*; note that 1 does the opposite of what it looks like, pinning the
-label to a single line whose minimum is the entire string).
+The fix turns off `hhomogeneous`/`vhomogeneous` on the status stack, so it
+sizes to the visible child. An adaptive layout wants this anyway. The fix also
+lets the row labels wrap (`title-lines`/`subtitle-lines` of **0**, which means
+*unlimited*). Note that 1 does the opposite of what it looks like: it pins the
+label to a single line whose minimum is the entire string.
 
 Result: content minimum **579px → 240px**, natural 579 → 423. The window renders
 correctly at 360×640, verified by the `narrow` screenshot check.
@@ -149,18 +149,18 @@ The runtime of the component was shutdown. Maybe you accidentally dropped a
 controller?: AvailableTagsLoaded([...])
 ```
 
-A registry fetch completing after its relm4 component was dropped sent into a
+Sometimes a fetch from the registry completed after the app dropped its relm4 component. The fetch then sent into a
 closed channel and panicked the worker thread.
 
 The trap is that `ComponentSender::input()` **unwraps internally**, so the
 `let _ =` some call sites already had was purely cosmetic — it discards a `()`,
 not an error.
 
-Fixed by delivering every background-thread result through
-`sender.input_sender().send(..)`, which returns a `Result` that can genuinely be
-ignored. Six sites in the changelog/registry/SBOM fetch paths. A late result for
-a page the user has already navigated away from is normal, not exceptional, so
-dropping it silently is the correct behaviour.
+The fix delivers every background-thread result through
+`sender.input_sender().send(..)`, which returns a `Result` that the caller can safely
+ignore. Six sites in the changelog/registry/SBOM fetch paths. A late result for
+a page that the user already left is normal, not exceptional, so
+the correct behaviour is to drop it silently.
 
 Click handlers and `update()` arms still use `input()` deliberately — the
 component is alive by definition at those points.
@@ -174,7 +174,7 @@ error: Failed to export bpf: System failure beyond the control of libseccomp
 ```
 
 Identical with `flatpak run org.flatpak.Builder` and native `flatpak-builder`,
-which pointed at the host rather than the manifest. But bubblewrap alone worked
+which pointed at the host and not at the manifest. But bubblewrap alone worked
 (`bwrap --ro-bind / / --unshare-all true`), and so did `flatpak build` against
 the SDK — so the sandbox itself was fine and only flatpak-builder's module step
 failed.
@@ -187,8 +187,8 @@ used. `just flatpak` now passes it.
 ## 9. Harness hazard: stale instances accumulate (not an app bug)
 
 `pkill -x finupdate` does not match instances launched via `toolbox run`, so
-repeated test launches left up to four processes alive. A leftover instance
-keeps the D-Bus name and the Broadway surface, which presents as a **blank
-screenshot** rather than an error — a trap worth knowing about when reading
+each new test launch left more processes alive, up to four. A leftover instance
+keeps the D-Bus name and the Broadway surface. This shows as a **blank
+screenshot** and not as an error. Know about this trap when you read
 failures. The launcher now matches on the full command line and warns if
 anything survives.

@@ -1,6 +1,6 @@
 # `uupd` configuration reference
 
-This directory captures the schema for `/etc/uupd/config.json` — the configuration file consumed by [`uupd`](https://github.com/ublue-os/uupd) on Bluefin and Universal Blue systems. Finupdate reads and writes this file when the user customizes automatic-update behavior from **Preferences → Configure Automatic Updates**.
+This directory captures the schema for `/etc/uupd/config.json` — the configuration file consumed by [`uupd`](https://github.com/ublue-os/uupd) on Bluefin and Universal Blue systems. Finupdate reads and writes this file when you change the automatic-update settings in **Preferences → Configure Automatic Updates**.
 
 ## Files
 
@@ -28,7 +28,7 @@ Each threshold gates the automatic timer-driven run only. Manual `uupd` invocati
 - `bat-min-percent` — *minimum* battery charge required. The run is *skipped* if charge is below this.
 - `cpu-max-percent` — *maximum* CPU load tolerated. The run is *skipped* if load is above this.
 - `mem-max-percent` — *maximum* RAM utilization tolerated. The run is *skipped* if utilization is above this.
-- `net-max-bytes` — *maximum* sustained network throughput tolerated, in bytes/second. The run is *skipped* if traffic is above this (avoids contending with active downloads).
+- `net-max-bytes` — *maximum* sustained throughput on the network that the run tolerates, in bytes/second. The run is *skipped* if traffic is above this (this avoids contention with active downloads).
 
 ## Module toggles
 

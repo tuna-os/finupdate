@@ -2,7 +2,7 @@
 
 **A modern GTK4/libadwaita system update frontend for Bluefin and Universal Blue**
 
-Finupdate provides a graphical interface for running system updates on [Bluefin](https://projectbluefin.io) and Universal Blue systems. It orchestrates `bootc`, `flatpak`, `brew`, and `distrobox` directly — no `uupd` required. It's the first app in the Bluefin utility suite and serves as a reference implementation for future apps.
+Finupdate provides a graphical interface to run system updates on [Bluefin](https://projectbluefin.io) and Universal Blue systems. It orchestrates `bootc`, `flatpak`, `brew`, and `distrobox` directly — no `uupd` required. It's the first app in the Bluefin utility suite and serves as a reference implementation for future apps.
 
 ![GNOME 47+](https://img.shields.io/badge/GNOME-47%2B-blue)
 ![Rust](https://img.shields.io/badge/Rust-2024_edition-orange)
@@ -11,10 +11,10 @@ Finupdate provides a graphical interface for running system updates on [Bluefin]
 ## Features
 
 - **One-click system updates** — orchestrates `bootc`, `flatpak`, `brew`, and `distrobox` via a single pkexec elevation
-- **Live log streaming** — real-time stdout/stderr from each update module
-- **Elapsed timer** — shows how long the update has been running
-- **Copy log** — clipboard integration for sharing output
-- **Cancel support** — gracefully cancel a running update
+- **Live log stream** — real-time stdout/stderr from each update module
+- **Elapsed timer** — shows how long the update has run
+- **Copy log** — clipboard integration to share output
+- **Cancel support** — gracefully cancel an update in progress
 - **Desktop notifications** — GNotification when update completes/fails
 - **Reboot prompt** — confirmation dialog to restart after updates
 - **Window close guard** — prevents accidental close during active updates
@@ -23,7 +23,7 @@ Finupdate provides a graphical interface for running system updates on [Bluefin]
 - **About dialog** — accessible via hamburger menu
 - **Flatpak sandbox aware** — uses `flatpak-spawn --host` when sandboxed
 - **Dark mode** — automatic via libadwaita (follows system preference)
-- **GNOME HIG compliant** — symbolic icons, proper spacing, accessibility
+- **GNOME HIG compliant** — symbolic icons, proper space between elements, accessibility
 
 ## Screenshots
 
@@ -39,7 +39,7 @@ The app has four states:
 - GTK 4.16+ (GNOME 47+)
 - libadwaita 1.7+
 - `bootc` or `rpm-ostree` on the host system
-- `flatpak`, `brew`, `distrobox` — optional; each module is skipped if the tool is absent
+- `flatpak`, `brew`, `distrobox` — optional; finupdate skips each module if the tool is absent
 - `uupd` — optional; if present, enables the "Automatic background updates" toggle in Preferences
 
 ### Build
@@ -49,7 +49,7 @@ The app has four states:
 
 ## Installing
 
-Released builds are published to the TunaOS Flatpak remote for x86_64 and
+We publish released builds to the TunaOS Flatpak remote for x86_64 and
 aarch64:
 
 ```bash
@@ -58,10 +58,10 @@ flatpak install tuna-os org.tunaos.finupdate
 ```
 
 The remote is an OCI index backed by `ghcr.io/tuna-os/finupdate`; see
-[tuna-os/flatpak-index](https://github.com/tuna-os/flatpak-index). Builds are
-pushed by `.github/workflows/publish-flatpak.yml` on every push to `main`.
+[tuna-os/flatpak-index](https://github.com/tuna-os/flatpak-index). The
+`.github/workflows/publish-flatpak.yml` workflow pushes builds on every push to `main`.
 
-If a published build turns out to be broken, see
+If a published build has a defect, see
 [runbooks/rollback-a-bad-finupdate-release.md](runbooks/rollback-a-bad-finupdate-release.md).
 
 ## Building
@@ -84,7 +84,7 @@ flatpak run org.tunaos.finupdate.Devel
 
 ### Option B: Native Meson build
 
-Requires GTK4 and libadwaita dev packages installed:
+You need the dev packages for GTK4 and libadwaita:
 
 ```bash
 # Fedora/Bluefin:
@@ -140,8 +140,8 @@ Idle ──[StartUpdate]──→ Updating ──[Complete]──→ Complete �
                             └──────[Cancel]──→ Idle
 ```
 
-The backend boundary is enforced by the separate `finupdate-core` crate: it
-does not depend on GTK and can be built and tested on a headless host. The GUI
+The separate `finupdate-core` crate enforces the backend boundary. It
+does not depend on GTK, and you can build and test it on a headless host. The GUI
 crate re-exports that backend for compatibility, adds the relm4 application,
 and exposes reusable widgets through the C ABI for the GNOME Settings panel.
 See the module-level documentation in
@@ -150,18 +150,18 @@ backend map.
 
 ### Key Design Decisions
 
-1. **relm4 over raw gtk4-rs** — Component model with message passing prevents callback spaghetti
+1. **relm4 over raw gtk4-rs** — Component model with messages prevents callback spaghetti
 2. **Tokio in a separate thread** — GTK owns the main thread; async I/O needs its own runtime
-3. **mpsc channels (not callbacks)** — Decouples worker from UI; enables isolated unit testing
+3. **mpsc channels (not callbacks)** — Decouples worker from UI; lets unit tests run in isolation
 4. **gtk::Stack (not show/hide)** — Built-in crossfade transitions, no manual visibility management
 5. **Imperative widget construction** — Some complex widgets built in `init()` when the view! macro can't express them
 
 ### Flatpak Sandbox Notes
 
-When running in Flatpak, the app uses `flatpak-spawn --host` to execute commands on the host:
-- Requires `--talk-name=org.freedesktop.Flatpak` in Flatpak manifest
+When it runs in Flatpak, the app uses `flatpak-spawn --host` to execute commands on the host:
+- Needs `--talk-name=org.freedesktop.Flatpak` in Flatpak manifest
 - Detection: checks for `/.flatpak-info` file
-- All host commands (uupd, systemctl) are automatically wrapped
+- The app automatically wraps all host commands (uupd, systemctl)
 
 ### Environment Variables
 
@@ -184,11 +184,11 @@ just gui-test
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow and guidelines.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for development workflow and guidelines.
 
 ## Reusable Patterns
 
-See [PATTERNS.md](PATTERNS.md) for documented architectural patterns that should be used by all future Bluefin utility apps.
+See [PATTERNS.md](PATTERNS.md) for documented architectural patterns. All future utility apps for Bluefin should use them.
 
 ## License
 
@@ -198,4 +198,4 @@ MIT — see [Cargo.toml](Cargo.toml)
 
 - [Project Bluefin](https://projectbluefin.io) — the desktop OS this is built for
 - [GNOME HIG](https://developer.gnome.org/hig/) — the design guidelines we follow
-- [uupd](https://github.com/ublue-os/uupd) — optional host daemon; if installed, its timer can be toggled from Preferences
+- [uupd](https://github.com/ublue-os/uupd) — optional host daemon; if installed, you can toggle its timer from Preferences

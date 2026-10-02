@@ -1,10 +1,10 @@
 # Contributing to Finupdate
 
-Thank you for your interest in contributing to Finupdate and the Bluefin utility app ecosystem!
+Thank you for your interest in contributions to Finupdate and to the ecosystem of Bluefin utility apps!
 
 ## Development Setup
 
-Finupdate is designed for Bluefin and other immutable Fedora-based desktops. The recommended workflow uses **toolbox** for fast Rust iteration and **flatpak-builder** (via Flatpak) for full integration testing. This matches how GNOME apps are developed upstream.
+We design Finupdate for Bluefin and other immutable Fedora-based desktops. The recommended workflow uses **toolbox** for fast Rust iteration and **flatpak-builder** (via Flatpak) for full integration tests. GNOME developers use the same workflow upstream.
 
 ### 1. Create a toolbox (one-time)
 
@@ -57,7 +57,7 @@ just run      # run the installed Flatpak
 
 - Keep `cargo build` and `flatpak-builder` output directories separate: toolbox builds go to `./target/`, Flatpak builds go to `./_flatpak/`. They don't conflict.
 - `flatpak-builder` always builds inside the SDK sandbox — the toolbox is only for fast iteration.
-- If you switch between the two, no cleanup is needed.
+- If you switch between the two, you do not need a cleanup.
 
 ## Architecture Overview
 
@@ -71,14 +71,14 @@ Read [PATTERNS.md](PATTERNS.md) for the full architecture. Key principles:
 ## Code Style
 
 ### Rust
-- Follow standard `rustfmt` formatting (default config)
+- Follow the standard `rustfmt` format (default config)
 - Use `tracing` macros (`tracing::info!`, `tracing::error!`) not `println!`
 - All public items need doc comments (`///`)
-- Module-level doc comments (`//!`) explain the *pattern*, not just what the code does
-- Prefer explicit error messages over `.unwrap()` in production paths
+- Module-level doc comments (`//!`) explain the *pattern*, not only what the code does
+- Prefer explicit messages for errors over `.unwrap()` in production paths
 
 ### GTK/Adwaita
-- **No hardcoded pixel values** for spacing — use CSS classes (`margin-12`, etc.) or Adwaita defaults
+- **No hardcoded pixel values** for space between elements — use CSS classes (`margin-12`, etc.) or Adwaita defaults
 - **No custom colors** — rely on Adwaita style classes (`suggested-action`, `destructive-action`, `dim-label`)
 - **Symbolic icons only** — always use `name-symbolic` suffix
 - **AdwStatusPage for states** — idle, error, success, and empty states
@@ -96,8 +96,8 @@ Read [PATTERNS.md](PATTERNS.md) for the full architecture. Key principles:
 1. Identify which layer owns the feature (`finupdate-core` for GTK-free backend
    behavior, `app.rs` for application state, or a focused module under `src/ui/`)
 2. Add message variants to the appropriate `Input`/`Output` enum
-3. Implement the handler in `update()`
-4. Update the view! macro or init() if new widgets are needed
+3. Write the handler in `update()`
+4. Update the view! macro or init() if you need new widgets
 5. Update PATTERNS.md if the feature introduces a new pattern
 
 ### Adding a New Component
@@ -110,7 +110,7 @@ touch src/ui/my_component.rs
 pub mod my_component;
 ```
 
-Then implement using the `#[relm4::component(pub)]` macro. See `log_view.rs`
+Then write it with the `#[relm4::component(pub)]` macro. See `log_view.rs`
 for a small component or `update_list.rs` for a larger one.
 
 ### Modifying the Flatpak Manifest
@@ -150,9 +150,9 @@ Quick sanity checks:
 - [ ] `toolbox run --container finupdate cargo build` compiles cleanly with no warnings
 - [ ] `toolbox run --container finupdate cargo clippy` passes
 - [ ] `just test` (or `cargo test --all-targets`) passes all unit tests
-- [ ] `just gui-test` passes Broadway GUI verification
+- [ ] `just gui-test` passes the Broadway GUI checks
 - [ ] App launches and the new feature works visually
-- [ ] Dark mode looks correct
+- [ ] The app looks correct in dark mode
 - [ ] Keyboard navigation works
 - [ ] No hardcoded colors or pixel values
 
