@@ -32,13 +32,38 @@ polkit.addRule(function(action, subject) {
         if (action.id == "org.freedesktop.login1.reboot") {
             return polkit.Result.YES;
         }
-        // Systemd unit management (for disabling/enabling uupd timer and other system services)
+        // Systemd unit management: finupdate only ever starts/stops/kills
+        // `uupd.timer` (see finupdate-core/src/uupd_compat.rs,
+        // `systemctl {enable,disable} --now uupd.timer`). systemd passes a
+        // per-call "unit" detail for this action (added in systemd commit
+        // 88ced61bf9673407f4b15bf51b1b408fd78c149d, covering start/stop/
+        // restart/kill/reset-failed/set-property), so we can scope the
+        // grant to that one unit instead of handing out passwordless
+        // control of every unit on the system.
         if (action.id == "org.freedesktop.systemd1.manage-units") {
-            return polkit.Result.YES;
+            if (action.lookup("unit") == "uupd.timer") {
+                return polkit.Result.YES;
+            }
         }
-        // Systemd unit file management (for modifying systemd configuration)
-        if (action.id == "org.freedesktop.systemd1.manage-unit-files") {
-            return polkit.Result.YES;
-        }
+        // Systemd unit *file* management (enable/disable, i.e. the symlink
+        // half of `systemctl enable/disable --now uupd.timer`) is a
+        // different action ID, and — unlike manage-units above — systemd
+        // does not pass a per-unit "unit" detail for it (confirmed against
+        // the same commit that added detail plumbing for manage-units; it
+        // touches only bus_unit_method_* for the running-unit actions, not
+        // the unit-file install/remove path). There is no way to scope
+        // this grant to `uupd.timer` in polkit rules on this systemd
+        // version, and a blanket YES here is passwordless root (writing or
+        // linking an arbitrary unit file is arbitrary code execution as
+        // root). So this deliberately does NOT return YES: it falls
+        // through to polkit's default authority for the action, which
+        // requires the admin password. That means the enable/disable half
+        // of the uupd-timer toggle in finupdate now prompts once
+        // (AUTH_ADMIN_KEEP-style caching applies per the system's own
+        // polkit.conf/pkla defaults) instead of being silent — the
+        // start/stop half above stays passwordless since it *can* be
+        // scoped exactly. If a future systemd adds a "unit" (or similar)
+        // detail to org.freedesktop.systemd1.manage-unit-files, narrow this
+        // the same way the block above does; don't restore a blanket YES.
     }
 });
