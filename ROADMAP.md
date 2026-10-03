@@ -1,6 +1,6 @@
 # finupdate Roadmap
 
-**Last updated**: 2026-09-17 | **Maintainer**: tuna-os (hanthor)
+**Last updated**: 2026-09-24 | **Maintainer**: tuna-os (hanthor)
 
 ---
 
@@ -29,7 +29,7 @@ terminal chore.
 
 | Priority | Item | Tracking | Status |
 |----------|------|----------|--------|
-| P0 | First tagged release (v0.1.0) — versioned OCI tag & GitHub Release | #65 | 🟡 In Progress |
+| P0 | First tagged release (v0.1.0) — versioned OCI tag & GitHub Release | #141 | 🟡 In Progress |
 | P1 | Harden Polkit rules and binary permissions | #110 | 🟢 Completed |
 | P1 | Standardize CI STE check & Renovate org preset | #115, #116 | 🟢 Completed |
 | P1 | Cargo.lock: unmaintained `proc-macro-error2` audit | #63 | 🟡 Open |
@@ -49,7 +49,7 @@ terminal chore.
 | Polkit security policy path enforcement | architect/sec-check | #110 | 🟢 Completed |
 | Simplified Technical English & Renovate governance adoption | ci-maintainer | #115, #116 | 🟢 Completed |
 | Rollback runbook documentation | docs | #104 | 🟢 Completed |
-| Cut v0.1.0 tag + first GitHub Release | hanthor | #65 | 🟡 Pending Release |
+| Cut v0.1.0 tag + first GitHub Release | hanthor | #141 | 🟡 Pending Release |
 
 ### Next Quarter (2026 Q4)
 
@@ -59,7 +59,7 @@ terminal chore.
 |------|-------|----------|--------|
 | God-file reduction & `finupdate-core` interface cleanup | architect | #62, #111 | ⬜ Planned |
 | Tag parsing & OCI registry test suite completion | quality | #118 | ⬜ Planned |
-| Release cadence aligned with org (tagged builds in index) | tuna-os | #65 | ⬜ Planned |
+| Release cadence aligned with org (tagged builds in index) | tuna-os | #141 | ⬜ Planned |
 
 ---
 
