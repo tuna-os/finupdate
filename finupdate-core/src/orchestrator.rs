@@ -193,11 +193,31 @@ pub async fn run(
 ///
 /// Inside a Flatpak the bundled runner lives at `/app/bin/finupdate-runner`,
 /// but that's a sandbox-internal path — `flatpak-spawn --host pkexec
-/// /app/bin/finupdate-runner` was failing with exit 127 because the host's
-/// pkexec doesn't see anything under `/app/`. Fix: stage the script body to
-/// a host-visible temp file, then invoke that path with pkexec. The temp
-/// file is named with a `finupdate-runner-` prefix so the polkit rules
-/// (`/etc/polkit-1/rules.d/49-finupdate.rules`) match it by name.
+/// /app/bin/finupdate-runner` fails with exit 127 because the host's pkexec
+/// doesn't see anything under `/app/`.
+///
+/// This used to work around that by staging the script body to a
+/// `mktemp`-created file under host `/tmp` and running `pkexec "$TMPFILE"`.
+/// `mktemp` itself was fine (unpredictable name, mode 0600, sticky `/tmp`),
+/// but the file stayed owned by and writable by the unprivileged user for as
+/// long as the polkit authorization dialog was up, and `pkexec` resolves and
+/// execs the path *after* that dialog is answered. Any code running as the
+/// same local user could rewrite the file's contents during that window and
+/// have root execute the swapped-in script instead (CVE-style TOCTOU —
+/// see issue #109).
+///
+/// Fix: never hand pkexec a path that stays writable by an unprivileged
+/// user. Elevate a fixed, root-owned interpreter (`/usr/bin/sh`) and pass
+/// the script body as its `-c` argument instead of via a file. The argument
+/// list is fixed at the moment `pkexec` is invoked — there is no file for
+/// pkexec to re-resolve at exec time, so there is nothing for a same-user
+/// attacker to rewrite during the authorization window. This is
+/// deliberately *not* added to the polkit exec allowlist
+/// (`build-aux/49-finupdate.polkit.rules`): allowlisting a shell by path
+/// would authorize arbitrary passwordless root commands for anyone who can
+/// invoke pkexec, which is a strictly worse hole than the one being closed
+/// here. The interactive authorization prompt for this path is expected and
+/// intentional.
 fn build_runner_command(system_only: bool) -> Command {
     if let Ok(mock_path) = std::env::var("FINUPDATE_TEST_MOCK_RUNNER") {
         let mut cmd = Command::new(mock_path);
@@ -212,42 +232,28 @@ fn build_runner_command(system_only: bool) -> Command {
         return cmd;
     }
 
-    // When system_only is true, the runner script skips flatpak/brew/distrobox
-    // and only refreshes the bootc image. pkexec strips most env vars by
-    // default, so we pass FINUPDATE_SYSTEM_ONLY *through* pkexec via the
-    // `env KEY=VAL CMD` idiom rather than relying on env inheritance.
-    let env_prefix = if system_only {
-        "env FINUPDATE_SYSTEM_ONLY=1 "
-    } else {
-        ""
-    };
-
     if is_flatpak() {
         let script_body = std::fs::read_to_string("/app/bin/finupdate-runner")
             .unwrap_or_else(|_| {
                 "#!/bin/sh\necho 'finupdate-runner script not bundled in this flatpak' >&2\necho '===DONE==='\nexit 127\n".to_string()
             });
 
-        // The double-`-c` wrapper: outer sh writes the script body (received
-        // on stdin) to a host /tmp file under a polkit-friendly name, then
-        // pkexec's the result. Trailing `rm` keeps /tmp tidy. Pipe the script
-        // body via env var so we don't need stdin plumbing.
-        let driver = format!(
-            r#"
-set -e
-TMPFILE=$(mktemp /tmp/finupdate-runner-XXXXXX.sh)
-trap 'rm -f "$TMPFILE"' EXIT
-printf '%s' "$FINUPDATE_RUNNER_BODY" > "$TMPFILE"
-chmod +x "$TMPFILE"
-pkexec {env_prefix}"$TMPFILE"
-"#
-        );
+        // Invoke a fixed, root-owned interpreter directly — no file, no
+        // TOCTOU window. `flatpak-spawn --host` forwards this argv straight
+        // to the host process (no shell involved on either hop), so
+        // `script_body` reaches root's `/usr/bin/sh -c` exactly as read from
+        // disk, without needing escaping.
+        //
+        // pkexec strips most env vars by default, so FINUPDATE_SYSTEM_ONLY
+        // is passed *through* pkexec via the `env KEY=VAL CMD` idiom rather
+        // than relying on env inheritance — same trick the old code used,
+        // just as argv elements instead of a shell-quoted string.
         let mut cmd = Command::new("flatpak-spawn");
-        cmd.arg("--host")
-            .arg(format!("--env=FINUPDATE_RUNNER_BODY={}", script_body))
-            .arg("sh")
-            .arg("-c")
-            .arg(driver);
+        cmd.arg("--host").arg("pkexec");
+        if system_only {
+            cmd.arg("env").arg("FINUPDATE_SYSTEM_ONLY=1");
+        }
+        cmd.arg("/usr/bin/sh").arg("-c").arg(script_body);
         cmd
     } else {
         // Native build / dev: PATH lookup. `cargo install --path .` or the
