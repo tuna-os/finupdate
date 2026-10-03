@@ -67,17 +67,19 @@ CI, and that migration is tracked separately. Don't quietly promote it.
 `build-aux/49-finupdate.polkit.rules` gives members of `wheel`
 **password-less** access to: `org.freedesktop.login1.reboot`,
 `org.freedesktop.systemd1.manage-units` and `manage-unit-files`, and
-`org.freedesktop.policykit.exec` where the target program's path *contains*
-the substring `bootc` or `finupdate-runner`. Note that `indexOf(…) >= 0` is a
-substring test against the full program path, not an equality check on a
-known-good path.
+`org.freedesktop.policykit.exec` where the target program's path *exactly
+matches* one of a small allowlist (`/usr/bin/bootc`, `/usr/sbin/bootc`,
+`/usr/bin/finupdate-runner`, `/usr/libexec/finupdate-runner`). The rule was
+once a substring test (`program.indexOf("bootc") >= 0`), which authorised
+any path merely containing that text; it was hardened to exact-path
+matching specifically because that included `/tmp/finupdate-runner-*.sh`
+(tuna-os/finupdate#124).
 
 Two things follow. Any change to what `finupdate-runner` executes changes what
 this rule effectively authorises, so treat that binary as a privilege
-boundary. And **`docs/POLKIT_RULES.md` is stale**: it documents an older rule
-keyed on `subject.user == "<local-user>"` and `action.command`, which is not
-what ships. Read the `.rules` file, not the doc, and prefer fixing the doc to
-copying it.
+boundary. `docs/POLKIT_RULES.md` matches the shipped `.rules` file today
+(both use exact-path matching); if the two drift again, prefer the `.rules`
+file and fix the doc rather than copying whichever is out of date.
 
 ## Checks
 
