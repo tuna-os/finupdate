@@ -2,7 +2,7 @@
 
 ## Overview
 
-Finupdate requires elevated privileges to interact with bootc and system management operations. This document describes the Polkit rules configured to allow these operations without interactive password prompts during testing and routine use.
+Finupdate needs root privileges for bootc operations and for system management. This document describes the Polkit rules that allow these operations with no password prompt. The rules apply to tests and to routine use.
 
 ## Rule: `/etc/polkit-1/rules.d/49-finupdate.rules`
 
@@ -10,7 +10,7 @@ Finupdate requires elevated privileges to interact with bootc and system managem
 Allows members of the `wheel` group to run the allowlisted bootc and
 finupdate-runner programs with no password prompt. Members can also reboot the
 system and manage systemd units and unit files. Designed for:
-- Automated testing in CI/CD environments
+- Automated tests in CI/CD environments
 - Development/debug mode operations
 - Non-destructive command verification (bootc status, upgrade checks)
 
@@ -43,17 +43,17 @@ polkit.addRule(function(action, subject) {
 The full shipped rule is `build-aux/49-finupdate.polkit.rules`; keep the two
 in step.
 
-**Match the whole path, never a substring.** `program.indexOf("bootc") >= 0`
-authorizes every executable whose path merely *contains* that text, so any
-unprivileged process can drop a script at `/home/u/bootc/x.sh` or
-`/tmp/finupdate-runner-1234.sh` and get it run as root with no password. A
-path belongs on the allowlist only if root owns it and no unprivileged user
-can write to it or to any directory leading to it.
+**Match the whole path, never a part of it.** `program.indexOf("bootc") >= 0`
+authorizes every executable whose path *contains* that text. Thus any
+unprivileged process can put a script at `/home/u/bootc/x.sh` or
+`/tmp/finupdate-runner-1234.sh`, and root runs it with no password. A
+path belongs on the allowlist only if root owns it. Also, no unprivileged user
+can write to it or to any directory above it.
 
 ### Operations Authorized
 
 #### bootc commands (all variants)
-- `bootc status --json` — Query current OS image metadata
+- `bootc status --json` — Query the metadata of the current OS image
 - `bootc status` — Human-readable status output
 - `bootc upgrade` — Stage image upgrades
 - `bootc upgrade --check` — Check for available upgrades
@@ -63,7 +63,7 @@ Executed via:
 - From Flatpak: `flatpak-spawn --host pkexec bootc <command>`
 
 #### System reboot
-- `systemctl reboot` — Initiate system restart
+- `systemctl reboot` — Start a system restart
 - Polkit action: `org.freedesktop.login1.reboot`
 
 #### Systemd unit management
@@ -81,33 +81,33 @@ privilege boundary.
 ### Security Notes
 
 **Scope**: Limited to members of `wheel`, and — for `pkexec` — to the exact
-program paths on the allowlist. It does not authorize arbitrary root command
-execution *provided* the allowlist stays exact-match and every entry is
-root-owned. A substring match, or an entry under a user-writable directory,
+program paths on the allowlist. It does not authorize arbitrary commands as root
+*provided* the allowlist stays exact-match and every entry is
+root-owned. A partial match, or an entry under a user-writable directory,
 removes that guarantee entirely.
 
-**Assumptions**: This configuration assumes members of `wheel` are trusted
+**Assumptions**: This configuration assumes that you trust members of `wheel`
 with system administration. Note what it still changes even so: `sudo`
-normally re-authenticates, and this rule does not. On a machine where the
-administrator's `sudo` requires a password, installing this rule means code
-running in that user's session — a compromised app, not a person — reaches
-the allowlisted programs as root with no prompt at all.
+normally re-authenticates, and this rule does not. Think of a machine where the
+administrator's `sudo` needs a password. With this rule, code
+that runs in that user's session can get to
+the allowlisted programs as root with no prompt at all. That code can be a compromised app, not a person.
 
-**Non-destructive intent**: The rule authorizes operations that are necessary for update checking and management, not arbitrary system modification. The finupdate application enforces additional safeguards:
+**Non-destructive intent**: The rule authorizes operations that are necessary to check and manage updates, not arbitrary system changes. The finupdate app has more safeguards:
 - Dev mode prevents actual reboots
-- Simulation scenarios allow safe testing without touching the real system
+- Simulation scenarios let you test safely, with no change to the real system
 
 ### Installation
 
-The rule is deployed during system setup or when finupdate is initialized:
+Install the rule during system setup or when you initialize finupdate:
 
 ```bash
 sudo install -m 0644 build-aux/49-finupdate.polkit.rules \
     /etc/polkit-1/rules.d/49-finupdate.rules
 ```
 
-Installing the file from the repository rather than pasting a second copy of
-the rule keeps one reviewed version of the allowlist.
+Install the file from the repository. Do not paste a second copy of
+the rule. Then there is only one reviewed version of the allowlist.
 
 ### Verification
 
@@ -123,11 +123,11 @@ pkexec bootc status
 
 ### Upstream Proposal
 
-This rule is intended as a model for upstreaming into the Dakota OS layer or a finupdate system package. The specific actions (bootc status, reboot) are legitimate for any system update tool and could be generalized for broader use.
+We intend this rule as a model to send upstream into the Dakota OS layer or a finupdate system package. The specific actions (bootc status, reboot) are legitimate for any system update tool. Other projects can make them general for broader use.
 
 ## Related Issues
 
-- **AT-SPI testing dependencies**: See `docs/GUI_TESTING.md` for notes on `gnome-ponytail-daemon` requirement for automated GUI tests.
+- **AT-SPI test dependencies**: See `docs/GUI_TESTING.md` for notes on `gnome-ponytail-daemon` requirement for automated GUI tests.
 
 ## References
 

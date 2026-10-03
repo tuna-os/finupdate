@@ -1,15 +1,15 @@
 # Finupdate — GNOME HIG Audit
 
-Audited against **gnome-spec** (the build host's `~/dev/gnome-spec`) v1.1.0 — the
-GNOME GUI Specification compiled from HIG v47 plus source audits of 33 GNOME
-Core/Circle apps. Section numbers below refer to `GNOME-GUI-SPEC.md`.
+This audit uses **gnome-spec** (the build host's `~/dev/gnome-spec`) v1.1.0 —
+the GNOME GUI Specification. It comes from HIG v47 and from audits of the
+source of 33 GNOME Core/Circle apps. Section numbers below refer to `GNOME-GUI-SPEC.md`.
 
 The closest reference app is **GNOME Software** (`audits/gnome-software.md`) —
 same problem domain (system updates), same shape (hero status + list of
-pending changes + detail drill-down).
+queued changes + detail drill-down).
 
-Scope: static audit of the widget tree as constructed in `src/`. Screenshot
-verification is tracked separately in `docs/GUI_TESTING.md`.
+Scope: static audit of the widget tree as constructed in `src/`. 
+`docs/GUI_TESTING.md` tracks the verification of screenshots separately.
 
 ---
 
@@ -40,12 +40,12 @@ verification is tracked separately in `docs/GUI_TESTING.md`.
 | 5 | Access keys | ✅ **fixed** — the preferences dialog had **zero** `use-underline` rows; access keys added to all nine focusable rows (Automatic Background Updates, Include App Updates, Configure Automatic Updates, Check Interval, Custom Interval, Pause on Metered Connections, Developer Mode, Enable Hardware Checks, Save to /etc/uupd/config.json). Group and page titles are headings, not focusable controls, so they are deliberately left alone. |
 | 6 | Preferences search | ✅ fixed — `set_search_enabled(true)`. |
 
-Also fixed while auditing, though not HIG findings as such: the dev-mode banner
-claimed "updates are simulated" during a dry run, which was simply untrue —
-it now distinguishes the two safety modes.
+We also fixed one item during the audit that is not a HIG issue as such.
+During a dry run, the dev-mode banner said that the updates were only a
+simulation, which was untrue. It now distinguishes the two safety modes.
 
 Six findings, ordered by impact below. Findings 1–3 are architectural and
-affect the gnome-control-center panel deliverable directly; 4–6 are
+directly affect the deliverable for the gnome-control-center panel; 4–6 are
 mechanical.
 
 ---
@@ -64,15 +64,16 @@ adw::ApplicationWindow {
     set_height_request: 500,
 ```
 
-A hard `width_request: 400` means the window *cannot* be narrowed to the
-360px the HIG requires, and nothing re-lays-out when it approaches that.
+A hard `width_request: 400` means that you *cannot* make the window narrower
+than the 360px that the HIG needs. Also, nothing re-lays-out when the width
+approaches that limit.
 
 **Why it matters more than usual here.** This is not only a phone-form-factor
 concern. The second deliverable embeds `UpdatesPanel` into
-gnome-control-center, whose content pane is resized by the *shell's* own
-breakpoints — Settings collapses to a single-pane layout on narrow windows.
-A panel that refuses to go below 400px will either clip or force the whole
-Settings window wider than the user asked for.
+gnome-control-center, where the *shell's* own breakpoints resize the content
+pane. Settings collapses to a single-pane layout on narrow windows.
+A panel that refuses to go below 400px will either clip or force the Settings
+window to become wider than the user asked for.
 
 **Fix.** Add an `AdwBreakpoint` on the window at `max-width: 550sp`, and have
 the rebase dialog's calendar grid + details panel switch from side-by-side to
@@ -91,20 +92,20 @@ There is no `*.gschema.xml` anywhere in the tree. `src/settings.rs` writes
 
 **Consequences beyond spec compliance:**
 
-- **No `dconf` visibility** — settings can't be inspected, reset, or managed
-  by policy the way every other GNOME app's can.
+- **No `dconf` visibility** — you can't inspect, reset, or manage the
+  settings by policy as you can for every other GNOME app.
 - **No change notification.** GSettings emits `changed::` signals; JSON does
   not. This is why the code re-reads `Settings::load()` at call sites
-  (`status_view.rs:1920`, `:2051`, `:2362`, `:3324`) instead of binding once —
-  and why those sites had to re-check `dry_run` defensively, since another
+  (`status_view.rs:1920`, `:2051`, `:2362`, `:3324`) instead of binding once.
+  It is also why those sites had to re-check `dry_run` defensively. Another
   part of the app may have rewritten the file in the meantime.
 - **The control-center panel is the real problem.** gnome-control-center
-  panels are expected to expose their settings through GSettings so the
+  panels must expose their settings through GSettings. Then the
   Settings search index can find them. A JSON blob is invisible to it.
 
 **Fix.** Define `org.tunaos.finupdate.gschema.xml`, migrate the
 `Settings` fields, and use `gio::Settings::bind()` for the switch/combo/spin
-rows — which also removes the manual `Rc<RefCell<Settings>>` plumbing in
+rows — which also removes the manual `Rc<RefCell<Settings>>` glue code in
 `preferences.rs`. Keep a one-shot importer for existing `settings.json` files.
 
 Note this composes cleanly with the new `RuntimeOverrides` layer: CLI
@@ -117,24 +118,24 @@ overrides stay in-memory and GSettings becomes the persistent tier.
 **Spec §3 "Stack + Back Navigation", Anti-Patterns: "Mix navigation
 patterns".**
 
-The app implements hierarchical drill-down (`PageChanged` / `GoBack`,
+The app has a hand-rolled hierarchical drill-down (`PageChanged` / `GoBack`,
 `app.rs:147`, `:724`, `:992`) over a raw `gtk::Stack`
-(`status_view.rs:947`), with the back button's visibility toggled by hand
+(`status_view.rs:947`), and it toggles the back button's visibility by hand
 (`app.rs:910`, `status_view.rs:320`).
 
 `AdwNavigationView` exists for exactly this and provides, for free:
 
 - the back button and its visibility,
-- **edge-swipe back gestures** (currently absent — a touch/trackpad
+- **edge-swipe back gestures** (absent today — a touch/trackpad
   regression against every other GNOME app),
 - per-page titles wired into `AdwHeaderBar`,
-- correct focus restoration when popping a page,
-- `Escape`/`Alt+Left` handling.
+- correct focus restoration when you pop a page,
+- support for `Escape`/`Alt+Left`.
 
-**Distinguish two uses of `gtk::Stack` here.** Using a stack to switch
-*visual state* (Idle → Updating → Complete → Error, `status_view.rs:947`) is
-legitimate and should stay — that's state, not navigation. The finding is
-specifically about *page* navigation (`preferences`, changelog, rebase
+**Distinguish two uses of `gtk::Stack` here.** A stack that switches
+*visual state* (`Idle` → `Updating` → `Complete` → `Error`, `status_view.rs:947`) is
+legitimate and should stay — that's state, not navigation. This issue applies
+only to *page* navigation (`preferences`, changelog, rebase
 subpages), which should become `AdwNavigationView`.
 
 `ffi.rs:252` and `:277` already describe the panel widgets as destined for an
@@ -179,7 +180,7 @@ access keys".**
 
 Three `use_underline` sites exist, all in the menu model (`_Keyboard
 Shortcuts`, `_About Finupdate`, `_Quit` — `app.rs:880`). None of the
-preference rows, dialog buttons, or action buttons declare one.
+preference rows, the dialog buttons, or the action buttons have one.
 
 **Fix.** Add `_` to labels and `use-underline: true` on `AdwSwitchRow`,
 `AdwComboRow`, `AdwSpinRow`, and every `AlertDialog` response.
@@ -197,14 +198,14 @@ dialog.set_search_enabled(false);
 
 The preferences dialog has multiple groups plus a nested uupd subpage with
 eight-plus rows — comfortably past the point where search earns its place.
-This looks like a deliberate choice made when the dialog was smaller; it
-should be flipped back on.
+This looks like a deliberate choice made when the dialog was smaller; we
+should turn it back on.
 
 ---
 
 ## What is already right
 
-Worth recording so it doesn't regress:
+Keep a record of these points so that they do not regress:
 
 - **Window architecture** (§2) — `AdwApplicationWindow` → `AdwToolbarView` →
   `AdwHeaderBar` + `AdwWindowTitle`. Textbook.
@@ -212,8 +213,8 @@ Worth recording so it doesn't regress:
 - **Status pages** (§6.4) — `AdwStatusPage` at 15 sites for empty/terminal
   states.
 - **Dialog discipline** (§6.3, Anti-Patterns "confirmation dialogs for
-  undoable actions") — `AdwAlertDialog` is used **only** for genuinely
-  irreversible operations: reboot, powerwash, factory reset, rollback, image
+  undoable actions") — finupdate uses `AdwAlertDialog` **only** for genuinely
+  irreversible operations. These are reboot, powerwash, factory reset, rollback, image
   switch/pin/unpin, and the NVIDIA-downgrade warning. Everything transient
   goes to a toast. This is the distinction most apps get wrong, and finupdate
   gets it right.
@@ -229,6 +230,6 @@ Worth recording so it doesn't regress:
    the re-read-settings-everywhere pattern that made dry-run hard to reason
    about.
 2. **`AdwNavigationView`** (#3) — the panel already assumes this shape.
-3. **Breakpoints** (#1) — needed before the panel can be embedded honestly.
+3. **Breakpoints** (#1) — needed before we can embed the panel honestly.
 4. Tooltips (#4), access keys (#5), preferences search (#6) — mechanical,
    independently landable, good first commits.

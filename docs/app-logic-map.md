@@ -2,28 +2,28 @@
 
 > **Status note (2026-07-26).** This document had drifted from the code. Known
 > corrections, now applied below:
->
-> * §6.2 described Developer Mode and the three simulator scenarios as
->   hamburger-menu items. They are **CLI-only** (`--dev-mode`, `--no-dev-mode`,
->   `--sim=<scenario>`) — see `preferences.rs` and `main.rs`. The menu now holds
->   only Keyboard Shortcuts / About / Quit.
-> * Whole features were missing: **Powerwash**, **Factory Reset**, **Restart
->   Tonight**, **unpin-to-stream**, and **rollback**. All live in
->   `src/ui/status_view.rs` and are listed in §4 below.
-> * The GUI test rows referenced `tests/smoke/` (dogtail/behave). That suite
->   cannot run on a build host. The primary suite is now
->   `tests/gui/test_features.py` (Broadway + screenshots + action journal);
->   see `docs/GUI_TESTING.md`.
-> * Every privileged command now routes through `src/privileged.rs` and is
->   recorded to a JSONL action journal (`src/action_journal.rs`), so the
->   "Touches" column in §4 is machine-checkable rather than aspirational.
+
+* §6.2 described Developer Mode and the three simulator scenarios as
+  hamburger-menu items. They are **CLI-only** (`--dev-mode`, `--no-dev-mode`,
+  `--sim=<scenario>`) — see `preferences.rs` and `main.rs`. The menu now holds
+  only Keyboard Shortcuts / About / Quit.
+* Whole features were missing: **Powerwash**, **Factory Reset**, **Restart
+  Tonight**, **unpin-to-stream**, and **rollback**. All live in
+  `src/ui/status_view.rs`, and §4 below lists them.
+* The rows for GUI tests referred to `tests/smoke/` (dogtail/behave). That suite
+  cannot run on a build host. The primary suite is now
+  `tests/gui/test_features.py` (Broadway + screenshots + action journal);
+  see `docs/GUI_TESTING.md`.
+* Every privileged command now goes through `src/privileged.rs`. That module
+  writes each command to a JSONL action journal (`src/action_journal.rs`).
+  A machine can thus check the "Touches" column in §4.
 
 A complete inventory of states, messages, user actions, backend touch-points,
 and side effects in finupdate. The purpose of this document is to drive test
 coverage — every row should be traceable to one or more tests (unit or
 dogtail).
 
-This document is **load-bearing** for the test suite. When you add a new state
+The test suite **depends** on this document. When you add a new state
 or message, update the table here and the matching test entry. When a test
 fails, find the row it covers and use the "Touches" column to narrow down
 which code paths to inspect.
@@ -65,7 +65,7 @@ which code paths to inspect.
 | Error      | (user retries)          | Idle        | reset; "Check for Updates" becomes active   |
 | Any        | `CloseRequest`          | (no change) | if Updating: refuses close + toast warning  |
 
-Tests covering this:
+Tests for this:
 - Unit: `src/update_worker.rs::tests::success_scenario_emits_all_four_modules_then_complete`
 - Unit: `src/update_worker.rs::tests::already_up_to_date_short_circuits_after_system`
 - Unit: `src/update_worker.rs::tests::failure_scenario_emits_error_after_system`
@@ -86,7 +86,7 @@ Runs on launch in a background tokio runtime. Calls `bootc upgrade --check`
 | `UpToDate`        | bootc returned 77                   | "Up to date" pill                  |
 | `Unknown`         | bootc errored, missing, or cancelled| neutral hero, manual check button only |
 
-Touches: `src/app.rs` (preflight closure starting ~L377) → `bootc upgrade --check`.
+Touches: `src/app.rs` (preflight closure that starts at ~L377) → `bootc upgrade --check`.
 
 Tests:
 - Unit: none yet (pure shell call) — **gap**: extract the exit-code → status mapping into a pure function and test it.
@@ -96,7 +96,7 @@ Tests:
 
 ## 3. Message flow (`AppMsg` in `src/app.rs:115`)
 
-Every variant must be exercised at least once. Grouped by intent:
+At least one test must exercise every variant. Grouped by intent:
 
 ### 3.1 Update lifecycle
 | Msg                          | Source                          | Handler outcome             | Test |
@@ -282,16 +282,16 @@ Legend: ✅ covered, ⚠️ partial, ❌ missing.
 | Reboot guard (CloseRequest while Updating) | ❌ | ❌  | needs GUI in Updating state, attempt close |
 | uupd subpage save                       | ❌   | ❌  | add: edit a spin, click Apply, parse written JSON |
 
-**Top three coverage gaps to close first:**
-1. Wire a wiremock-based test for `registry_client::fetch_versions` — it's the rebase dialog's data spine and is currently untested.
-2. Extract the preflight exit-code mapping into a pure function and unit-test it (currently inlined in `app.rs`).
-3. Add a dogtail scenario that forces `Updating` state then attempts window close — this verifies the cancel-or-block guard which has historically broken.
+**Top three gaps in coverage to close first:**
+1. Wire a wiremock-based test for `registry_client::fetch_versions` — it's the rebase dialog's data spine, and no test covers it now.
+2. Extract the preflight exit-code mapping into a pure function and unit-test it (`app.rs` inlines it now).
+3. Add a dogtail scenario that forces `Updating` state then tries to close the window. This verifies the cancel-or-block guard which has historically broken.
 
 ---
 
 ## 8. How to use this map when adding a test
 
-1. Find the row that describes what you're testing.
+1. Find the row that describes what your test covers.
 2. Use the "Touches" or selector column to know which file/widget to drive.
 3. Mark the matrix cell ✅ once the test lands.
-4. If the row doesn't exist yet, **add it here in the same PR** — otherwise the map drifts and stops being load-bearing.
+4. If the row doesn't exist yet, **add it here in the same PR**. Otherwise the map drifts, and the tests cannot depend on it.
