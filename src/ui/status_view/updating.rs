@@ -3,7 +3,7 @@
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use crate::ui::bootc_probe::read_image_info;
+use crate::bootc_probe::read_image_info;
 use crate::ui::log_view::LogView;
 use crate::ui::segmented_progress::SegmentedProgress;
 use crate::ui::update_list::UpdateList;

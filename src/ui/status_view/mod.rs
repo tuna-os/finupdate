@@ -46,9 +46,10 @@ use source_page::build_source_page;
 use updating::build_updating_page;
 use uptodate::build_uptodate_page;
 
-// Host introspection moved to `bootc_probe`; glob-imported so the call
-// sites here — and the unit tests — keep referring to these by their bare names.
-use super::bootc_probe::*;
+// Host introspection moved to `finupdate_core::bootc_probe` (finupdate#111);
+// glob-imported so the call sites here — and the unit tests — keep referring
+// to these by their bare names.
+use crate::bootc_probe::*;
 use crate::ui::log_view::{LogView, LogViewInput};
 use crate::ui::segmented_progress::{SegmentedProgress, same_segment};
 use crate::ui::update_list::{UpdateList, UpdateListInput};

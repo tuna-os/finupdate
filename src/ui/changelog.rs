@@ -9,8 +9,8 @@
 use relm4::prelude::*;
 use std::time::Instant;
 
-use super::bootc_probe::{get_cached_bootc_status, read_selected_tag, strip_date_suffix};
 use super::status_view::{StatusView, StatusViewInput};
+use crate::bootc_probe::{get_cached_bootc_status, read_selected_tag, strip_date_suffix};
 use crate::settings::Settings;
 use finupdate_core::version_parse::parse_org_repo;
 
