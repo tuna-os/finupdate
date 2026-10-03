@@ -1,0 +1,70 @@
+{
+  "version": "1.0.0",
+  "metadata": {
+    "description": "Auto-QA self-tuning configuration for finupdate",
+    "project": "finupdate",
+    "enabled": true
+  },
+  "quality_gates": {
+    "coverage": {
+      "enabled": true,
+      "thresholds": {
+        "project": {
+          "target": 45,
+          "threshold": 2
+        },
+        "patch": {
+          "target": 70,
+          "informational": true
+        }
+      }
+    },
+    "linting": {
+      "enabled": true,
+      "tools": [
+        {
+          "name": "clippy",
+          "level": "deny",
+          "description": "Rust lints via cargo clippy"
+        },
+        {
+          "name": "rustfmt",
+          "level": "warn",
+          "description": "Code formatting via cargo fmt"
+        }
+      ]
+    },
+    "testing": {
+      "enabled": true,
+      "min_pass_rate": 100,
+      "description": "All unit and integration tests must pass"
+    }
+  },
+  "auto_tuning": {
+    "enabled": true,
+    "strategy": "conservative",
+    "learning_window": 20,
+    "adjustment_factor": 0.05,
+    "rules": [
+      {
+        "metric": "coverage",
+        "condition": "below_target_for_n_runs",
+        "n": 5,
+        "action": "lower_threshold_by_adjustment_factor"
+      },
+      {
+        "metric": "clippy_violations",
+        "condition": "increasing_trend",
+        "action": "alert_maintainer"
+      }
+    ]
+  },
+  "ci_checks": {
+    "repository": "tuna-os/finupdate",
+    "workflow": ".github/workflows/ci.yml",
+    "checks": [
+      "test",
+      "linting"
+    ]
+  }
+}
