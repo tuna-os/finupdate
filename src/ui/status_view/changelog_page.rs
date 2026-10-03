@@ -4,11 +4,11 @@ use adw::prelude::*;
 use relm4::prelude::*;
 
 use crate::app::PreflightStatus;
-use crate::registry_client::ImageVersion;
 use crate::bootc_probe::{
     build_stack_items, find_booted_match, get_host_kernel, read_booted_tag_suffix,
     read_selected_tag,
 };
+use crate::registry_client::ImageVersion;
 use crate::ui::changelog::SbomStatus;
 use finupdate_core::version_parse::parse_org_repo;
 

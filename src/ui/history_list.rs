@@ -17,8 +17,8 @@ use gtk::prelude::*;
 use relm4::prelude::*;
 
 use super::status_view::{StatusView, StatusViewInput};
-use crate::bootc_probe::get_real_deployments;
 pub use crate::bootc_probe::MockDeployment;
+use crate::bootc_probe::get_real_deployments;
 
 pub fn get_sample_deployments(_reboot_pending: bool) -> Vec<MockDeployment> {
     // Always try real data first; return empty if unavailable rather than
