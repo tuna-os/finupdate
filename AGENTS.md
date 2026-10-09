@@ -67,17 +67,21 @@ CI, and that migration is tracked separately. Don't quietly promote it.
 `build-aux/49-finupdate.polkit.rules` gives members of `wheel`
 **password-less** access to: `org.freedesktop.login1.reboot`,
 `org.freedesktop.systemd1.manage-units` and `manage-unit-files`, and
-`org.freedesktop.policykit.exec` where the target program's path *contains*
-the substring `bootc` or `finupdate-runner`. Note that `indexOf(…) >= 0` is a
-substring test against the full program path, not an equality check on a
-known-good path.
+`org.freedesktop.policykit.exec` where the target program's path exactly
+matches an entry in `FINUPDATE_ALLOWED_PROGRAMS` (currently `/usr/bin/bootc`,
+`/usr/sbin/bootc`, `/usr/bin/finupdate-runner`,
+`/usr/libexec/finupdate-runner`). #110 replaced an earlier substring check
+(`program.indexOf("bootc") >= 0`) with this exact array-membership test,
+because a substring match authorises any path that merely contains the text —
+including one an unprivileged process can create.
 
-Two things follow. Any change to what `finupdate-runner` executes changes what
-this rule effectively authorises, so treat that binary as a privilege
-boundary. And **`docs/POLKIT_RULES.md` is stale**: it documents an older rule
-keyed on `subject.user == "<local-user>"` and `action.command`, which is not
-what ships. Read the `.rules` file, not the doc, and prefer fixing the doc to
-copying it.
+Any change to what `finupdate-runner` executes changes what this rule
+effectively authorises, so treat that binary as a privilege boundary. A path
+belongs on `FINUPDATE_ALLOWED_PROGRAMS` only if root owns it and no
+unprivileged user can write to it or to any directory on the way to it.
+`docs/POLKIT_RULES.md` documents this same exact-match rule and is the more
+detailed of the two; keep them in step rather than treating the `.rules` file
+as the only source of truth.
 
 ## Checks
 
