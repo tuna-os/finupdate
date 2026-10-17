@@ -190,3 +190,69 @@ pub(crate) fn days_in_month(date: NaiveDate) -> u32 {
         )
         .num_days() as u32
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::service::ImageRef;
+
+    fn family(base: &str) -> FamilyInfo {
+        FamilyInfo {
+            name: format!("{base} family"),
+            base_image: base.to_string(),
+            features: vec![],
+            streams: vec![],
+        }
+    }
+
+    fn booted(image: &str) -> ImageRef {
+        ImageRef {
+            registry: "ghcr.io".to_string(),
+            org: "projectbluefin".to_string(),
+            image: image.to_string(),
+            tag: "stable".to_string(),
+            digest: String::new(),
+        }
+    }
+
+    #[test]
+    fn derives_dx_and_nvidia_from_suffix() {
+        let fam = family("bluefin");
+        assert_eq!(
+            derive_initial_toggle_state(&fam, Some(&booted("bluefin-dx-nvidia-open"))),
+            (true, true)
+        );
+        assert_eq!(
+            derive_initial_toggle_state(&fam, Some(&booted("bluefin-dx"))),
+            (true, false)
+        );
+        assert_eq!(
+            derive_initial_toggle_state(&fam, Some(&booted("bluefin-nvidia"))),
+            (false, true)
+        );
+    }
+
+    #[test]
+    fn bare_base_or_unknown_image_is_all_off() {
+        let fam = family("bluefin");
+        assert_eq!(derive_initial_toggle_state(&fam, None), (false, false));
+        assert_eq!(
+            derive_initial_toggle_state(&fam, Some(&booted("bluefin"))),
+            (false, false)
+        );
+        assert_eq!(
+            derive_initial_toggle_state(&fam, Some(&booted("aurora-dx"))),
+            (false, false)
+        );
+    }
+
+    #[test]
+    fn february_has_28_or_29_days() {
+        let feb23 = NaiveDate::from_ymd_opt(2023, 2, 15).unwrap();
+        let feb24 = NaiveDate::from_ymd_opt(2024, 2, 15).unwrap();
+        let dec = NaiveDate::from_ymd_opt(2024, 12, 1).unwrap();
+        assert_eq!(days_in_month(feb23), 28);
+        assert_eq!(days_in_month(feb24), 29);
+        assert_eq!(days_in_month(dec), 31);
+    }
+}

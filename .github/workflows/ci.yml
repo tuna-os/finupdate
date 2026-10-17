@@ -97,10 +97,17 @@ jobs:
           BROADWAY_DISPLAY: ":0"
         run: |
           # Measure coverage of the testable non-UI layer.
-          # The GTK ui/ files, app.rs, dbus_progress.rs and main.rs are
-          # deliberately excluded: they require a live display server and
-          # are exercised via the GUI smoke tests rather than unit tests.
-          EXCLUDE='src/ui/|src/app\.rs|src/dbus_progress\.rs|src/main\.rs'
+          # Only the display-dependent files are excluded: everything under
+          # src/ui/ that imports gtk/relm4/gdk/adw needs a live display
+          # server and is exercised via the GUI smoke tests rather than
+          # unit tests. The GTK-free modules that happen to live in src/ui/
+          # (bootc_progress, rebase_target, settings_io, mod, and the test
+          # modules) stay in the denominator — measured 2026-10-17 (#111):
+          # only bootc_progress had tests then, so narrowing adds uncovered
+          # lines; rebase_target gained unit tests in the same change to
+          # offset. If Codecov reports the project below the 45% gate after
+          # this, add tests for settings_io next rather than re-blanketing.
+          EXCLUDE='src/app\.rs|src/dbus_progress\.rs|src/main\.rs|src/ui/(bootc_probe|changelog|history_list|host_actions|log_view|preferences|segmented_progress|update_check_dialog|update_list)\.rs|src/ui/rebase_dialog/(calendar|execution|fetch|mod|switches)\.rs|src/ui/status_view/(changelog_page|complete|dialogs|error|helpers|idle|mod|source_page|updating|uptodate)\.rs'
           cargo llvm-cov --all-features --workspace \
             --ignore-filename-regex "$EXCLUDE"
           cargo llvm-cov --all-features --workspace \

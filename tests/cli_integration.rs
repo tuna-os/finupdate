@@ -52,8 +52,8 @@ mod cli_tests {
         assert!(output.status.success());
         let stdout = String::from_utf8_lossy(&output.stdout);
         assert!(stdout.contains("Usage: finupdate-cli"));
+        assert!(stdout.contains("probe"));
         assert!(stdout.contains("timer [cmd]"));
-        assert!(stdout.contains("update"));
     }
 
     #[test]
@@ -302,6 +302,33 @@ mod cli_tests {
         assert_eq!(output.status.code(), Some(2));
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(stderr.contains("unknown command"));
+    }
+
+    #[test]
+    fn test_cli_probe_prints_offline_summary() {
+        // `probe` shares the GUI hero row's core bootc_probe path but needs
+        // no registry and no display: os-release + uname are enough for at
+        // least the image and kernel lines on any Linux host.
+        let env = MockEnv::new();
+        let exe = get_cli_exe();
+
+        let output = Command::new(&exe)
+            .arg("probe")
+            .env("XDG_CONFIG_HOME", &env.config_dir)
+            .output()
+            .unwrap();
+
+        assert!(output.status.success());
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains("image: "), "probe should print image line");
+        assert!(
+            stdout.contains("kernel: "),
+            "probe should print kernel line"
+        );
+        assert!(
+            stdout.contains("deployments: "),
+            "probe should print deployments line"
+        );
     }
 
     #[test]

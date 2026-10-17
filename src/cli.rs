@@ -5,7 +5,11 @@
 //! link app/ui/dbus_progress/gpu, only the service trait + its dependencies.
 //!
 //! Subcommands:
-//!   - `status`   — print the currently-booted image ref
+//!   - `probe`    — print the booted deployment summary via core bootc_probe
+//!     (image identity, booted ref + digest/date, tag suffix, kernel, and
+//!     the staged/current/rollback deployment list). Needs no registry
+//!     access and shares the GUI hero row's data path, so headless images
+//!     and tests can assert what the GUI would show.
 //!   - `family`   — print the detected family + its switchable features
 //!   - `versions` — list recent dated versions of the booted image
 //!   - `tags`     — list tags published for the booted image's stream
@@ -18,8 +22,8 @@
 // Backend modules now live in the `finupdate-core` crate; aliased here so the
 // existing `crate::settings::…` paths keep resolving.
 use finupdate_core::{
-    action_journal, config, orchestrator, privileged, registry_client, runtime, sbom_diff, service,
-    settings, update_worker, uupd_compat,
+    action_journal, bootc_probe, config, orchestrator, privileged, registry_client, runtime,
+    sbom_diff, service, settings, update_worker, uupd_compat,
 };
 
 use std::process::ExitCode;
@@ -32,6 +36,7 @@ Usage: finupdate-cli <command> [args]
 Commands:
   status              Show the currently-booted image
   family              Show the detected family and available feature toggles
+  probe               Show the booted deployment summary (offline, no registry)
   versions            List recent dated versions for the booted image
   tags                List published tags for the booted image's stream
   changelog [tag]     Print recent GitHub commits + SBOM package diff
@@ -73,6 +78,7 @@ fn main() -> ExitCode {
         }
         "status" => rt.block_on(cmd_status()),
         "family" => rt.block_on(cmd_family()),
+        "probe" => cmd_probe(),
         "versions" => {
             let count = std::env::args()
                 .nth(2)
@@ -98,6 +104,54 @@ fn main() -> ExitCode {
             eprint!("{}", USAGE);
             ExitCode::from(2)
         }
+    }
+}
+
+/// Print the booted deployment summary via core `bootc_probe` — the same
+/// data path as the GUI hero row (`read_image_info`,
+/// `read_booted_image_summary`, `read_booted_tag_suffix`,
+/// `get_real_deployments`, `get_host_kernel`), but with no registry access
+/// and no display. Synchronous: none of these need the tokio runtime.
+fn cmd_probe() -> ExitCode {
+    let mut found = false;
+
+    if let Some(info) = bootc_probe::read_image_info() {
+        println!("image: {}", info);
+        found = true;
+    }
+    if let Some(summary) = bootc_probe::read_booted_image_summary() {
+        for (i, line) in summary.lines().enumerate() {
+            println!("booted{}: {}", if i == 0 { "" } else { "-detail" }, line);
+        }
+        found = true;
+    }
+    if let Some(tag) = bootc_probe::read_booted_tag_suffix() {
+        println!("tag: {}", tag);
+        found = true;
+    }
+    let kernel = bootc_probe::get_host_kernel();
+    if kernel != "—" {
+        println!("kernel: {}", kernel);
+        found = true;
+    }
+    match bootc_probe::get_real_deployments() {
+        Some(deployments) => {
+            println!("deployments: {}", deployments.len());
+            for d in &deployments {
+                let digest = d.digest.strip_prefix("sha256:").unwrap_or(&d.digest);
+                let digest = digest.chars().take(12).collect::<String>();
+                println!("  - {} {} {} {}", d.state, d.image, digest, d.deployed);
+            }
+            found = true;
+        }
+        None => println!("deployments: (none detected)"),
+    }
+
+    if found {
+        ExitCode::SUCCESS
+    } else {
+        eprintln!("finupdate-cli: probe found no bootc state on this host");
+        ExitCode::FAILURE
     }
 }
 
