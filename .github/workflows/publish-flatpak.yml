@@ -28,16 +28,105 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  release-verify:
+    name: Verify release tag
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+      - name: Check version, changelog, and CI gate
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="$(awk -F'"' '/^version = / { print $2; exit }' Cargo.toml)"
+          test -n "$version"
+          test "${RELEASE_TAG#v}" = "$version"
+          grep -Fq "## [$version]" CHANGELOG.md
+          ci_successes="$(
+            gh run list \
+              --repo "$REPOSITORY" \
+              --workflow CI \
+              --commit "$COMMIT_SHA" \
+              --limit 20 \
+              --json conclusion \
+              --jq '[.[] | select(.conclusion == "success")] | length'
+          )"
+          test "$ci_successes" -gt 0
+
+  create-release:
+    name: Create GitHub release
+    needs: release-verify
+    if: >
+      always() &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.release-verify.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+      - name: Ensure published GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$REPOSITORY" >/dev/null 2>&1; then
+            draft="$(gh release view "$RELEASE_TAG" --repo "$REPOSITORY" --json isDraft --jq '.isDraft')"
+            if [ "$draft" = "true" ]; then
+              release_id="$(
+                gh release view "$RELEASE_TAG" \
+                  --repo "$REPOSITORY" \
+                  --json databaseId \
+                  --jq '.databaseId'
+              )"
+              gh api --method PATCH \
+                "repos/$REPOSITORY/releases/$release_id" \
+                -F draft=false >/dev/null
+            fi
+            echo "Release $RELEASE_TAG exists and is published"
+          else
+            gh release create "$RELEASE_TAG" \
+              --repo "$REPOSITORY" \
+              --verify-tag \
+              --title "finupdate $RELEASE_TAG" \
+              --notes-file CHANGELOG.md
+          fi
+
   publish:
+    needs: [release-verify, create-release]
     # Only a successful CI run for a *push* to this repo's main counts: a
     # pull_request run from a fork branch also named `main` has
-    # head_branch == 'main' too and must never publish.
+    # head_branch == 'main' too and must never publish. Version tags additionally
+    # need the release-version and GitHub Release gates above.
     if: >
-      github.event_name != 'workflow_run' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_branch == 'main' &&
-       github.event.workflow_run.head_repository.full_name == github.repository)
+      always() &&
+      (
+        !startsWith(github.ref, 'refs/tags/v') ||
+        (needs.release-verify.result == 'success' &&
+         needs.create-release.result == 'success')
+      ) &&
+      (
+        github.event_name != 'workflow_run' ||
+        (github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.event == 'push' &&
+         github.event.workflow_run.head_branch == 'main' &&
+         github.event.workflow_run.head_repository.full_name == github.repository)
+      )
     uses: tuna-os/.github/.github/workflows/publish-flatpak.yml@main
     with:
       app-id: org.tunaos.finupdate

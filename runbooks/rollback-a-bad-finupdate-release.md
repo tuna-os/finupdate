@@ -15,14 +15,17 @@ fix forward on `main` instead.
 - `.github/workflows/publish-flatpak.yml` fires on `v*` tags, on manual
   dispatch, and — for pushes to `main` — only after the `CI` workflow for
   that push succeeds (gated via `workflow_run`, #150, the #103 policy half).
-  Tag pushes and manual dispatches are deliberate, human-triggered releases
-  and bypass the gate. There is no release branch and no approval step.
+  A version tag also requires a successful `CI` run for the exact tagged
+  commit, checks the Cargo/changelog version, and creates or publishes the
+  GitHub Release before bundle upload. There is no release branch or approval
+  step.
 - Published images land in `ghcr.io/tuna-os/finupdate` under the **mutable**
-  tags `latest`, `latest-x86_64` and `latest-aarch64`. Previous builds stay in
-  the registry as untagged digests; they are still pullable by digest, but
-  nothing in this repository records which digest came from which commit.
+  tags `latest`, `latest-x86_64` and `latest-aarch64`. A version tag such as
+  `v0.1.0` also creates immutable architecture-specific tags
+  `v0.1.0-x86_64` and `v0.1.0-aarch64`; these preserve the release identity
+  while the `latest*` tags continue to serve the TunaOS remote.
 - The user-facing remote (`https://tunaos.org/flatpak/tuna-os.flatpakrepo`) is
-  an OCI index over those tags, maintained in `tuna-os/flatpak-index`.
+  an OCI index over the `latest*` tags, maintained in `tuna-os/flatpak-index`.
 - A publish run takes roughly **6–25 minutes** end to end. Treat that as the
   floor for rollback time on the primary path below.
 
@@ -158,14 +161,14 @@ build until the republish lands.
 
 These are limitations of the current release setup, not steps:
 
-1. **No immutable release identity.** Only `latest*` tags are published, so a
-   rollback target can only be named by digest or by matching timestamps
-   between `gh run list` and the packages API. Tagged releases would remove
-   this entire step. Owner action still needed: cut the first immutable tag
-   (`v0.1.0` per ROADMAP; #65 closed 2026-09-23 without landing any tags and
-   the repo has zero tags today) so a rollback target has a name.
+1. **Immutable release identity is available for tagged releases.** A version
+   tag such as `v0.1.0` publishes `v0.1.0-x86_64` and `v0.1.0-aarch64`, so
+   the tagged build can be named directly instead of reconstructed from
+   timestamps. Untagged main builds still require the timestamp/digest pairing
+   described above.
 2. **~~Publish is not gated on `CI`.~~ Resolved by #150:** pushes to `main`
-   publish only after the `CI` workflow for that push succeeds. Tag pushes
-   and manual dispatches still bypass the gate by design.
+   publish only after the `CI` workflow for that push succeeds. Version tags
+   additionally verify a successful `CI` run for the exact tag commit; manual
+   dispatches still bypass the gate by design.
 3. **Index refresh is out of band.** Re-pointing the registry tags is not the
    same as clients seeing the change; that depends on `tuna-os/flatpak-index`.

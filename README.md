@@ -72,7 +72,10 @@ flatpak install tuna-os org.tunaos.finupdate
 
 The remote is an OCI index backed by `ghcr.io/tuna-os/finupdate`; see
 [tuna-os/flatpak-index](https://github.com/tuna-os/flatpak-index). The
-`.github/workflows/publish-flatpak.yml` workflow pushes builds on every push to `main`.
+`.github/workflows/publish-flatpak.yml` workflow publishes the current build
+after CI succeeds on `main`. A `vX.Y.Z` tag additionally publishes
+architecture-specific OCI tags and attaches Flatpak bundles to its GitHub
+Release; see [docs/RELEASING.md](docs/RELEASING.md) for the release contract.
 
 If a published build has a defect, see
 [runbooks/rollback-a-bad-finupdate-release.md](runbooks/rollback-a-bad-finupdate-release.md).
