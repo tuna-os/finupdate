@@ -92,7 +92,7 @@ jobs:
           cargo test --test dakota_image_history -- --test-threads=1 --nocapture
 
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@e891bb389537b38fb955c19833f884ca3188a61d # cargo-llvm-cov
+        uses: taiki-e/install-action@db07720855ab1f9adf78d37929621da20c5775a4 # cargo-llvm-cov
 
       - name: Generate Code Coverage
         env:
